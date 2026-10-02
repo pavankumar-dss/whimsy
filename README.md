@@ -1,7 +1,7 @@
 # Whimsy
 
-A Minecraft-style 3D parkour climb in a single HTML file (three.js). You climb through six biomes to The End, fight the
-Ender Dragon on the summit, then fly the Elytra gates home.
+A Mineshaft-style 3D parkour climb in a single HTML file (three.js). You climb through six biomes to The End, fight the
+Bender Dragon on the summit, then fly the Flytra gates home.
 
 **Play:** open the GitHub Pages link for this repo, or open `index.html` in a browser.
 
@@ -10,7 +10,7 @@ Ender Dragon on the summit, then fly the Elytra gates home.
 | Key | Action |
 | --- | --- |
 | W A S D | Move |
-| Space | Jump · in mid-air with the Elytra: open the wings |
+| Space | Jump · in mid-air with the Flytra: open the wings |
 | Shift | Sprint |
 | Mouse | Camera / steer in flight |
 | Left mouse / F | Draw and shoot the bow (dragon fight) |
