@@ -937,14 +937,111 @@ function geometryFrom(batches, grouped) {
   geo.setIndex(new THREE.BufferAttribute(idx, 1));
   return geo;
 }
+// Texture arrays: a flush puts every block texture it uses (and the self-lit blocks' glow copies) into one
+// DataArrayTexture, so a chunk draws all its opaque blocks in one call, its cutouts in another, and so on —
+// instead of one call per texture (the 48 m chunks × ~180 materials were most of a frame's ~1,500 draw calls).
+// Each vertex carries aTex = (texture layer, glow layer, glow intensity × 1000). Textures that change at runtime
+// (BLOCK_ANIM), aren't 16×16, or don't fit in the array keep their own material, as before. Cutouts get a depth
+// material that reads the array too, so their shadows keep their holes.
+const BLOCK_ANIM = new Set(['netherLava']);            // TEX.netherLava.offset scrolls (the Nether lava falls)
+const BLOCK_TEX = 16, BLOCK_LAYERS = 256;               // WebGL2 guarantees ≥ 256 array layers
+const blockArrShader = {
+  vs: vs => 'attribute vec3 aTex;\nvarying vec3 vTex;\nvarying vec2 vUvA;\n' +
+    vs.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvTex = aTex; vUvA = uv;'),
+  fs: (fs, map, glow) => 'uniform highp sampler2DArray blockArr;\nvarying vec3 vTex;\nvarying vec2 vUvA;\n' +
+    fs.replace('#include <map_fragment>', map)
+      .replace('#include <emissivemap_fragment>', glow),
+};
+function blockArrayTexture(images) {                   // canvases (16×16) → one sRGB, nearest, repeating array
+  const c = document.createElement('canvas');
+  c.width = c.height = BLOCK_TEX;
+  const g = c.getContext('2d', { willReadFrequently: true }), S = BLOCK_TEX * BLOCK_TEX * 4;
+  const data = new Uint8Array(S * images.length);
+  images.forEach((im, l) => {
+    g.clearRect(0, 0, BLOCK_TEX, BLOCK_TEX);
+    g.drawImage(im, 0, 0);
+    const px = g.getImageData(0, 0, BLOCK_TEX, BLOCK_TEX).data, row = BLOCK_TEX * 4;
+    for (let y = 0; y < BLOCK_TEX; y++)                // rows bottom-up: what flipY does for the canvas textures
+      data.set(px.subarray((BLOCK_TEX - 1 - y) * row, (BLOCK_TEX - y) * row), l * S + y * row);
+  });
+  const t = new THREE.DataArrayTexture(data, BLOCK_TEX, BLOCK_TEX, images.length);
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.generateMipmaps = false;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
+function blockArrayMaterial(arr, m) {                  // m: the per-texture material it stands in for
+  const mat = new THREE.MeshLambertMaterial({ transparent: m.transparent, opacity: m.opacity, alphaTest: m.alphaTest });
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.blockArr = { value: arr };
+    sh.vertexShader = blockArrShader.vs(sh.vertexShader);
+    sh.fragmentShader = blockArrShader.fs(sh.fragmentShader,
+      'diffuseColor *= texture( blockArr, vec3( vUvA, vTex.x ) );',
+      'if ( vTex.z > 0.5 ) totalEmissiveRadiance += texture( blockArr, vec3( vUvA, vTex.y ) ).rgb * ( vTex.z * 0.001 );');
+  };
+  mat.customProgramCacheKey = () => 'blockArr';
+  return mat;
+}
+function blockArrayDepth(arr) {                        // shadow pass for cutouts (alphaTest comes from the mesh material)
+  const mat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.blockArr = { value: arr };
+    sh.vertexShader = blockArrShader.vs(sh.vertexShader);
+    sh.fragmentShader = blockArrShader.fs(sh.fragmentShader, 'diffuseColor.a *= texture( blockArr, vec3( vUvA, vTex.x ) ).a;', '');
+  };
+  mat.customProgramCacheKey = () => 'blockArrDepth';
+  return mat;
+}
+function blockArrayable(key, mat) {
+  const t = TEX[key];
+  return !BLOCK_ANIM.has(key) && mat.map === t && t.image && t.image.width === BLOCK_TEX && t.image.height === BLOCK_TEX &&
+    t.repeat.x === 1 && t.repeat.y === 1 && t.offset.x === 0 && t.offset.y === 0 && t.rotation === 0;
+}
+function addBlockMesh(geo, mat) {
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = !mat.transparent;
+  mesh.receiveShadow = true;
+  mesh.matrixAutoUpdate = false;
+  scene.add(mesh);
+  return mesh;
+}
 // build the merged meshes for everything added so far (ensureCourse calls it once the course is built)
 function flushBlocks() {
-  for (const b of blockBatches.values()) {
-    const mesh = new THREE.Mesh(geometryFrom([b]), b.mat);
-    mesh.castShadow = !b.mat.transparent;
-    mesh.receiveShadow = true;
-    mesh.matrixAutoUpdate = false;
-    scene.add(mesh);
+  const layers = new Map(), images = [], groups = new Map();
+  const layerOf = (k, im) => {
+    if (!layers.has(k)) { if (images.length >= BLOCK_LAYERS) return -1; layers.set(k, images.length); images.push(im); }
+    return layers.get(k);
+  };
+  for (const [bk, b] of blockBatches) {
+    const [chunk, key, r] = bk.split('|'), role = +r;
+    let l = -1, gl = 0;
+    if (renderer.capabilities.isWebGL2 && blockArrayable(key, b.mat)) {
+      l = layerOf(key, TEX[key].image);
+      if (l >= 0 && role) gl = layerOf('glow:' + key, glowTexture(key).image);
+    }
+    if (l < 0 || gl < 0) { addBlockMesh(geometryFrom([b]), b.mat); continue; }   // the per-texture way
+    const m = b.mat, gk = `${chunk}|${m.transparent ? m.opacity : 1}|${m.alphaTest}`;
+    let gr = groups.get(gk);
+    if (!gr) groups.set(gk, gr = { m, parts: [] });
+    const look = GLOW[key] || GLOW.default;
+    gr.parts.push({ b, l, gl, gi: role ? Math.round((role === 1 ? look.top : look.side) * 1000) : 0 });
+  }
+  if (groups.size) {
+    const arr = blockArrayTexture(images), mats = new Map();
+    let depth = null;
+    for (const { m, parts } of groups.values()) {
+      const mk = `${m.transparent ? m.opacity : 1}|${m.alphaTest}`;
+      if (!mats.has(mk)) mats.set(mk, blockArrayMaterial(arr, m));
+      const geo = geometryFrom(parts.map(p => p.b)), at = new Uint16Array(geo.attributes.position.count * 3);
+      let v = 0;
+      for (const p of parts)
+        for (let i = p.b.pos.length / 3; i > 0; i--, v += 3) { at[v] = p.l; at[v + 1] = p.gl; at[v + 2] = p.gi; }
+      geo.setAttribute('aTex', new THREE.BufferAttribute(at, 3));
+      const mesh = addBlockMesh(geo, mats.get(mk));
+      if (m.alphaTest > 0 && mesh.castShadow) mesh.customDepthMaterial = depth = depth || blockArrayDepth(arr);
+    }
   }
   blockBatches.clear();
 }
@@ -5775,14 +5872,39 @@ function toggleMute() {
   document.getElementById('btn-mute').textContent = muted ? '🔇' : '🔊';
 }
 // Quality tiers — the ✨ button cycles high → medium → low → potato. pr: max pixel ratio; shadow: sun shadow map
-// size (0 = off); far: × every biome's fog distances (and so the far plane). Desktops start on high, touch devices on
-// medium. Until the player picks one, a run that averages under QUALITY_FPS fps steps down a tier (autoQuality).
+// size (0 = off); far: × every biome's fog distances (and so the far plane); cull: meshes smaller than this many CSS
+// px on screen aren't drawn (detailCull). Desktops start on high, touch devices on medium. Until the player picks
+// one, a run that averages under QUALITY_FPS fps steps down a tier (autoQuality).
 const QUALITY = [
-  { icon: '🥔', name: 'potato', pr: 0.75, bloom: false, shadow: 0,    far: 0.6 },
-  { icon: '💤', name: 'low',    pr: 1,    bloom: false, shadow: 0,    far: 0.8 },
-  { icon: '🌤', name: 'medium', pr: 1.5,  bloom: false, shadow: 1024, far: 1 },
-  { icon: '✨', name: 'high',   pr: 2,    bloom: true,  shadow: 2048, far: 1 },
+  { icon: '🥔', name: 'potato', pr: 0.75, bloom: false, shadow: 0,    far: 0.6, cull: 6 },
+  { icon: '💤', name: 'low',    pr: 1,    bloom: false, shadow: 0,    far: 0.8, cull: 4 },
+  { icon: '🌤', name: 'medium', pr: 1.5,  bloom: false, shadow: 1024, far: 1,   cull: 2.5 },
+  { icon: '✨', name: 'high',   pr: 2,    bloom: true,  shadow: 2048, far: 1,   cull: 1.5 },
 ];
+// Detail culling: a far TNT block or piston lamp is a pixel or two on screen but still a draw call (there are
+// thousands of small meshes). Every frame, a plain mesh whose bounding sphere spans fewer than QUAL.cull CSS px moves
+// to render layer 1, which neither the camera nor the sun's shadow camera draws, and back to layer 0 once it's bigger
+// again. `visible` stays the game's own. The mesh list is rebuilt every DETAIL.REFRESH s (meshes come and go).
+const DETAIL = { REFRESH: 2, MAX_R: 8 };              // MAX_R: bigger meshes (merged blocks, the sea …) always draw
+const detail = { list: [], t: Infinity };
+const _dV = new THREE.Vector3();
+function detailCull(dt) {
+  if ((detail.t += dt) >= DETAIL.REFRESH) {
+    detail.t = 0; detail.list.length = 0;
+    scene.traverse(o => {
+      if (o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && o.frustumCulled && o.geometry && (o.layers.mask === 1 || o.layers.mask === 2))
+        detail.list.push(o);
+    });
+  }
+  const k = innerHeight / 2 / Math.tan(camera.fov * Math.PI / 360) / QUAL.cull, cp = camera.position;
+  for (const o of detail.list) {
+    const g = o.geometry;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    const bs = g.boundingSphere, r = bs.radius * o.matrixWorld.getMaxScaleOnAxis();
+    const tiny = r < DETAIL.MAX_R && 2 * r * k < _dV.copy(bs.center).applyMatrix4(o.matrixWorld).distanceTo(cp);
+    o.layers.mask = tiny ? 2 : 1;
+  }
+}
 const QUALITY_FPS = 40;
 let qualityPicked = tipStoreGet('whimsy-quality', null);
 let qTier = qualityPicked !== null && QUALITY[+qualityPicked] ? +qualityPicked : (COARSE ? 2 : 3);
@@ -5830,7 +5952,7 @@ const fpsMon = {
   },
 };
 // ?fps=1: a frame-rate readout (bottom left) with the tier and the draw calls, for tuning on a real device
-const fpsEl = /[?&]fps=1/.test(location.search) ? document.getElementById('fps') : null;
+const fpsEl = /[?&]fps=1\b/.test(location.search) ? document.getElementById('fps') : null;
 const fpsShow = { t: 0, n: 0 };
 function fpsReadout(dt) {
   if (!fpsEl) return;
@@ -9576,7 +9698,28 @@ const tntSideM = tntMat(tntSideTex, false), tntTopM = tntMat(tntTopTex, false);
 const tntSideF = tntMat(tntSideTex, true), tntTopF = tntMat(tntTopTex, true);
 const TNT_MATS = [tntSideM, tntSideM, tntTopM, tntTopM, tntSideM, tntSideM];
 const TNT_FLASH = [tntSideF, tntSideF, tntTopF, tntTopF, tntSideF, tntSideF];   // primed TNT blinks white
-const tntGeo = new THREE.BoxGeometry(1, 1, 1);
+const tntGeo = packBoxGroups(new THREE.BoxGeometry(1, 1, 1), TNT_MATS);   // 2 draw calls per TNT block, not 6
+// A box with a material array draws once per face (6 groups) even when faces share a material. This reorders the
+// faces so faces with the same mats[i] are contiguous, one group each. Every material array used with the geometry
+// must follow the same pattern (TNT_FLASH mirrors TNT_MATS).
+function packBoxGroups(geo, mats) {
+  const idx = geo.index.array, runs = new Map();
+  for (const g of geo.groups) {
+    const m = mats[g.materialIndex];
+    if (!runs.has(m)) runs.set(m, { mi: g.materialIndex, gs: [] });
+    runs.get(m).gs.push(g);
+  }
+  const out = new idx.constructor(idx.length);
+  let o = 0;
+  geo.clearGroups();
+  for (const { mi, gs } of runs.values()) {
+    const start = o;
+    for (const g of gs) { out.set(idx.subarray(g.start, g.start + g.count), o); o += g.count; }
+    geo.addGroup(start, o - start, mi);
+  }
+  geo.setIndex(new THREE.BufferAttribute(out, 1));
+  return geo;
+}
 const tntDustGeo = new THREE.BoxGeometry(0.24, 0.04, 1);
 const tntDustOff = new THREE.MeshLambertMaterial({ color: 0x6a0c0a, emissive: 0x2a0000 });
 const tntDustOn = new THREE.MeshBasicMaterial({ color: 0xff3418 });                // powered redstone
@@ -13832,6 +13975,7 @@ function animate() {
     camera.lookAt(P.x, P.y + 1.4, P.z);
   }
 
+  detailCull(dt);
   ocean.position.x = player.pos.x; ocean.position.z = player.pos.z;   // an endless sea under a course of any length
   sun.position.set(player.pos.x + 40, player.pos.y + 60, player.pos.z + 30);
   sun.target.position.copy(player.pos);
