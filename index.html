@@ -23,6 +23,9 @@
   }
   /* aiming the bow: a thin cross, and the charge meter under it while drawing */
   #crosshair.aim { width: 2px; height: 18px; margin: -9px 0 0 -1px; }
+  /* lock-on: a ring round the locked target (placed per frame) */
+  #lock-mark { position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; display: none;
+    border: 3px solid #facc15; border-radius: 50%; box-shadow: 0 0 6px #facc15; }
   #crosshair.aim::after { content: ''; position: absolute; left: -8px; top: 8px; width: 18px; height: 2px; background: #fff; }
   #bow-meter { position: absolute; top: calc(50% + 18px); left: 50%; width: 46px; height: 7px; margin-left: -23px; display: none;
     border: 2px solid #000; background: rgba(0,0,0,.5); }
@@ -141,6 +144,8 @@
   #t-jump { right: calc(26px + env(safe-area-inset-right)); bottom: 30px; width: 92px; height: 92px; font-size: .6rem; }
   #t-bow { right: calc(134px + env(safe-area-inset-right)); bottom: 36px; width: 78px; height: 78px; font-size: 1.7rem; }
   #t-use { right: calc(40px + env(safe-area-inset-right)); bottom: 140px; width: 64px; height: 64px; font-size: 1.5rem; }
+  #t-lock { right: calc(146px + env(safe-area-inset-right)); bottom: 128px; width: 58px; height: 58px; font-size: 1.4rem; }
+  #t-lock.on { background: rgba(250,204,21,.35); border-color: #facc15; }
   #rotate { position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column; align-items: center;
     justify-content: center; gap: 18px; background: #0f172a; color: #fff; text-align: center; padding: 24px;
     font-family: 'Press Start 2P', monospace; font-size: .8rem; line-height: 1.8; }
@@ -170,6 +175,17 @@
     #pause-screen h1 { font-size: 1.4rem !important; }
   }
   @media (max-width: 760px) { body.touch #hud .hud-box:last-child { display: none; } }
+  /* the dragon fight: hearts (bottom centre), the tired-arms badge, a red flash when hurt */
+  #hearts { position: absolute; bottom: calc(14px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+    display: none; gap: 2px; align-items: center; filter: drop-shadow(2px 2px 0 rgba(0,0,0,.6)); }
+  #hearts img { width: 21px; height: 18px; image-rendering: pixelated; }
+  #hearts.shake { animation: hshake .3s; }
+  @keyframes hshake { 25% { transform: translateX(calc(-50% - 4px)); } 75% { transform: translateX(calc(-50% + 4px)); } }
+  #tired { position: absolute; bottom: calc(40px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: none;
+    font-family: 'Press Start 2P', monospace; font-size: .5rem; color: #c4b5fd; text-shadow: 2px 2px #1e1b4b; white-space: nowrap; }
+  #hurt { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(220,20,20,.55) 100%); }
+  @media (max-height: 520px) { #hearts img { width: 16px; height: 14px; } #tired { bottom: 32px; } }
   /* ⚙ settings panel (over the menus and the pause screen) */
   #set-panel { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,.55); pointer-events: all; padding: 10px; }
@@ -197,10 +213,12 @@
 <body>
 
 <div id="vignette"></div>
+<div id="hurt"></div>
 <div id="touch">
   <div class="t-stick" id="t-stick-hint"><div class="t-knob"></div></div>
   <div class="t-stick" id="t-stick"><div class="t-knob" id="t-knob"></div></div>
   <div class="t-btn off" id="t-use">🛏</div>
+  <div class="t-btn off" id="t-lock">🎯</div>
   <div class="t-btn off" id="t-bow">🏹</div>
   <div class="t-btn" id="t-jump">JUMP</div>
 </div>
@@ -210,6 +228,7 @@
 <div id="ui">
   <div id="crosshair"></div>
   <div id="bow-meter"><div id="bow-fill"></div></div>
+  <div id="lock-mark"></div>
   <div id="hud">
     <div class="hud-box"><b id="hud-time">0:00</b><span>Time</span></div>
     <div class="hud-box"><b id="hud-height">0m</b><span>Height</span></div>
@@ -227,6 +246,8 @@
   </div>
   <div id="gate-arrow"></div>
   <div id="boss"><span id="boss-name">🐉 Ender Dragon</span><div id="boss-track"><div id="boss-fill"></div></div></div>
+  <div id="hearts"></div>
+  <div id="tired"></div>
   <div id="settings">
     <button class="set-btn" id="btn-mute" title="Mute (M)">🔊</button>
     <button class="set-btn" id="btn-settings" title="Settings">⚙</button>
@@ -243,7 +264,7 @@
     <div class="controls touch-only">
       Left thumb: <kbd>🕹</kbd> move — push to the rim to sprint<br>
       Right thumb: drag to look &nbsp;·&nbsp; <kbd>JUMP</kbd><br>
-      <kbd>🏹</kbd> hold to draw, drag to aim (dragon fight) &nbsp;·&nbsp; <kbd>↩</kbd> last checkpoint &nbsp;·&nbsp; <kbd>⏸</kbd> pause
+      <kbd>🏹</kbd> hold to draw, drag to aim · <kbd>🎯</kbd> lock on (dragon fight) &nbsp;·&nbsp; <kbd>↩</kbd> last checkpoint &nbsp;·&nbsp; <kbd>⏸</kbd> pause
     </div>
     <div class="controls desktop-only">
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp;
@@ -251,7 +272,7 @@
       <kbd>Mouse</kbd> Camera<br>
       <kbd>Shift</kbd> Sprint &nbsp;·&nbsp; Hold <kbd>W</kbd> on ladders &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; <kbd>Esc</kbd> Pause<br>
       <kbd>⌫</kbd> Last checkpoint &nbsp;·&nbsp; <kbd>R</kbd> Quick restart<br>
-      <kbd>LMB</kbd>/<kbd>F</kbd> Bow (dragon fight) &nbsp;·&nbsp; <kbd>E</kbd> Use<br>
+      <kbd>LMB</kbd>/<kbd>F</kbd> Bow (dragon fight) &nbsp;·&nbsp; <kbd>Q</kbd> Lock on &nbsp;·&nbsp; <kbd>E</kbd> Use<br>
     </div>
     <div style="margin-bottom: 14px;">
       <input id="seed-input" type="text" placeholder="SEED (optional)"
@@ -319,6 +340,7 @@
       <button data-v="0" id="sp-fps-display">Display</button><button data-v="60">60</button><button data-v="30">30</button>
     </div></div>
     <p class="sp-note" id="sp-fps-note"></p>
+    <div class="sp-row"><span>Aim assist</span><div class="seg" id="sp-assist"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
     <div class="sp-row touch-only"><span>Look speed</span><input type="range" id="sens" min="0.4" max="2.5" step="0.1" value="1"></div>
     <div class="sp-row"><span>FPS counter</span><div class="seg" id="sp-showfps"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
     <div class="sp-row"><span>Sound</span><div class="seg" id="sp-sound"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
@@ -753,6 +775,7 @@ function ctl(s) {
     .replace(/R restarts the run/g, '↺ in the ⏸ menu restarts it')
     .replace(/🛏 E —/g, '🛏 Tap 🛏 —')
     .replace(/\bSPACE\b/g, 'JUMP')
+    .replace(/\bQ\b/g, '🎯')
     .replace(/\bA\/D\b/g, '◀ ▶')
     .replace(/\bW\b/g, '▲')
     .replace(/\bS\b/g, '▼');
@@ -5953,7 +5976,7 @@ function detailCull(dt) {
 // Kept in localStorage ('whimsy-settings'). Under test automation (navigator.webdriver) nothing adapts.
 function tipStoreGet(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
 const SET = (() => {
-  const d = { mode: 'framerate', tier: COARSE ? 2 : 3, fps: COARSE ? 60 : 0, showFps: false, sens: +tipStoreGet('whimsy-sens', 1) || 1 };
+  const d = { mode: 'framerate', tier: COARSE ? 2 : 3, fps: COARSE ? 60 : 0, showFps: false, assist: true, sens: +tipStoreGet('whimsy-sens', 1) || 1 };
   const saved = tipStoreGet('whimsy-settings', null), old = tipStoreGet('whimsy-quality', null);
   if (saved) { try { Object.assign(d, JSON.parse(saved)); } catch { /* defaults */ } }
   else if (old !== null && QUALITY[+old]) Object.assign(d, { mode: 'quality', tier: +old });   // picked with the old ✨ button
@@ -6128,6 +6151,7 @@ const setPanel = {
     seg('sp-fps', SET.fps);
     seg('sp-showfps', SET.showFps ? 1 : 0);
     seg('sp-sound', muted ? 0 : 1);
+    seg('sp-assist', SET.assist ? 1 : 0);
     document.getElementById('sp-fps-display').textContent = `Display (${FRAME.hz})`;
     document.getElementById('sp-fps-label').textContent = SET.mode === 'quality' ? 'Frame rate cap' : 'Target frame rate';
     const pct = DRS.scale < 1 ? ` at ${Math.round(DRS.scale * 100)}% resolution` : '';
@@ -6149,12 +6173,13 @@ const setPanel = {
     if (key === 'tier') { SET.tier = +v; applyQuality(SET.tier); }
     if (key === 'fps') { SET.fps = +v; FRAME.due = 0; frameCtl.reset(); }
     if (key === 'showfps') SET.showFps = v === '1';
+    if (key === 'assist') SET.assist = v === '1';
     if (key === 'sound' && (v === '1') === muted) toggleMute();
     saveSettings();
     this.sync();
   },
 };
-for (const [id, key] of [['sp-mode', 'mode'], ['sp-tier', 'tier'], ['sp-fps', 'fps'], ['sp-showfps', 'showfps'], ['sp-sound', 'sound']])
+for (const [id, key] of [['sp-mode', 'mode'], ['sp-tier', 'tier'], ['sp-fps', 'fps'], ['sp-showfps', 'showfps'], ['sp-sound', 'sound'], ['sp-assist', 'assist']])
   for (const b of document.querySelectorAll(`#${id} button`)) b.onclick = () => setPanel.set(key, b.dataset.v);
 document.getElementById('sp-done').onclick = () => setPanel.close();
 for (const id of ['btn-settings', 'btn-settings-menu', 'btn-settings-pause'])
@@ -6293,6 +6318,7 @@ addEventListener('keydown', e => {
   if (e.target instanceof HTMLInputElement) return;           // typing a seed: no jump / mute / restart
   if (e.code === 'Space') { e.preventDefault(); if (!keys['Space'] && started && !paused) player.jumpBuffer = JUMP_BUFFER; }
   if (e.code === 'KeyM') toggleMute();
+  if (e.code === 'KeyQ' && started && !paused && !e.repeat) BS.lockReq = true;   // lock on (dragon fight), taken in the step
   if (e.code === 'Backspace' && started) { e.preventDefault(); if (!e.repeat) backToCheckpoint(); }
   if (e.code === 'KeyR' && started && !e.repeat) relaunch(true);
   if (e.code === 'KeyP' || e.code === 'Escape') {
@@ -6331,7 +6357,7 @@ const stick = { on: false, id: -1, cx: 0, cy: 0, x: 0, y: 0, mag: 0 };
 const look = { id: -1, x: 0, y: 0 };
 const tbtn = {};                                        // pointerId → button key ('Space', 'KeyF', 'KeyE')
 let lookSens = SET.sens;
-const TEL = Object.fromEntries(['touch', 't-stick', 't-knob', 't-jump', 't-bow', 't-use'].map(k => [k, document.getElementById(k)]));
+const TEL = Object.fromEntries(['touch', 't-stick', 't-knob', 't-jump', 't-bow', 't-use', 't-lock'].map(k => [k, document.getElementById(k)]));
 function goFullscreen() {                               // Android: fullscreen + landscape lock (iOS has neither)
   const el = document.documentElement;
   if (!el.requestFullscreen || document.fullscreenElement) return;
@@ -6372,6 +6398,7 @@ TEL.touch.addEventListener('pointerdown', e => {
   if (!started || paused) return;
   const btn = e.target.closest('.t-btn');
   TEL.touch.setPointerCapture(e.pointerId);
+  if (btn && btn.id === 't-lock') { BS.lockReq = true; return; }
   if (btn) {
     const code = btn.id === 't-jump' ? 'Space' : btn.id === 't-bow' ? 'KeyF' : 'KeyE';
     tbtn[e.pointerId] = code;
@@ -6418,6 +6445,8 @@ function touchFrame(dt) {
   const fight = typeof BS !== 'undefined' && BS.has && DF.active && !player.flying;
   TEL['t-bow'].classList.toggle('off', !fight);
   TEL['t-use'].classList.toggle('off', !(fight && BS.bedNear));
+  TEL['t-lock'].classList.toggle('off', !fight);
+  TEL['t-lock'].classList.toggle('on', fight && !!BS.lock);
   document.getElementById('btn-cp').style.visibility = HARDCORE ? 'hidden' : '';
   if (innerHeight > innerWidth) pauseGame();           // turned to portrait: the rotate screen covers the game
 }
@@ -6895,55 +6924,252 @@ function updateAtmosphere(dt) {
   }
 }
 
-// ============ Dragon ============
-// The Ender Dragon: a blocky model facing +z (head forward), dark purple-grey with a faint self-light so it reads
-// against the End's black sky. DRAGON_HEAD / _HALF: the head + snout hit box in model units (the summit fight).
-const DRAGON_HEAD = new THREE.Vector3(0, 0.55, 5.75), DRAGON_HEAD_HALF = new THREE.Vector3(0.7, 0.65, 1.65);
-const dragon = (() => {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: 0x3b3147, emissive: 0x1c0f2a, emissiveIntensity: 0.9 });
-  const pale = new THREE.MeshLambertMaterial({ color: 0x6b5a7a, emissive: 0x24123a, emissiveIntensity: 0.7 });
-  const membrane = new THREE.MeshLambertMaterial({ color: 0x55446a, emissive: 0x2a1640, emissiveIntensity: 0.8, side: THREE.DoubleSide });
-  const part = (w, h, d, x, y, z, m = mat) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    b.position.set(x, y, z); b.castShadow = true; g.add(b); return b;
+// ============ Fire particles ============
+// One pool of additive square sparks for every fire effect (fireball trails, blasts, the dragon's flame, apples):
+// fx.emit(x, y, z, vx, vy, vz, life, size, hex). Looks only: they never touch the simulation, so Math.random is fine.
+const fx = (() => {
+  const N = 900, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), vel = new Float32Array(N * 3);
+  const life = new Float32Array(N), max = new Float32Array(N), base = new Float32Array(N * 3), grav = new Float32Array(N);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const tex = px(8, (g, s) => { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(0, 0, s, s); g.fillStyle = '#fff'; g.fillRect(2, 2, 4, 4); });
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.45, map: tex, vertexColors: true, transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  pts.frustumCulled = false;
+  scene.add(pts);
+  let next = 0, live = 0;
+  const c = new THREE.Color();
+  for (let i = 0; i < N; i++) pos[i * 3 + 1] = -1e5;
+  return {
+    emit(x, y, z, vx, vy, vz, l, size, hex, g = 0) {
+      const i = next; next = (next + 1) % N;
+      pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+      vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz;
+      life[i] = max[i] = l; grav[i] = g;
+      c.setHex(hex); base[i * 3] = c.r * size; base[i * 3 + 1] = c.g * size; base[i * 3 + 2] = c.b * size;
+      live = N;
+    },
+    burst(p, n, speed, l, size, hexes, g = 0) {                 // n sparks in random directions
+      for (let k = 0; k < n; k++) {
+        const u = Math.random() * 2 - 1, a = Math.random() * 6.283, r = Math.sqrt(1 - u * u), v = speed * (0.4 + Math.random() * 0.6);
+        this.emit(p.x, p.y, p.z, Math.cos(a) * r * v, u * v, Math.sin(a) * r * v, l * (0.6 + Math.random() * 0.4), size, hexes[k % hexes.length], g);
+      }
+    },
+    step(dt) {
+      if (!live) return;
+      let any = 0;
+      for (let i = 0; i < N; i++) {
+        if (life[i] <= 0) continue;
+        any++;
+        life[i] -= dt;
+        if (life[i] <= 0) { pos[i * 3 + 1] = -1e5; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0; continue; }
+        const k = life[i] / max[i];
+        vel[i * 3 + 1] -= grav[i] * dt;
+        pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+        const d = Math.exp(-2.2 * dt);
+        vel[i * 3] *= d; vel[i * 3 + 2] *= d;
+        col[i * 3] = base[i * 3] * k; col[i * 3 + 1] = base[i * 3 + 1] * k * k; col[i * 3 + 2] = base[i * 3 + 2] * k * k * k;   // white-hot → orange → dark
+      }
+      if (!any) live = 0;
+      geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+    },
   };
-  part(2.2, 1.6, 6, 0, 0, 0);                                                     // body
-  part(1.6, 0.4, 5.2, 0, -0.85, 0, pale);                                         // belly
-  part(1, 1, 1.8, 0, 0.35, 3.6);                                                  // neck
-  part(1.4, 1.2, 2.2, 0, 0.6, 5.2);                                               // head
-  part(1, 0.6, 1.1, 0, 0.45, 6.8);                                                // snout
-  part(1, 0.3, 1.8, 0, -0.1, 6.2, pale);                                          // jaw
-  for (const s of [-1, 1]) part(0.2, 0.5, 0.2, s * 0.35, 0.95, 7.2, pale);        // nostril horns
-  for (const s of [-1, 1]) part(0.25, 0.55, 0.9, s * 0.45, 1.35, 4.6, pale);      // head horns
-  [[0.9, 0.8, 2, -4], [0.65, 0.6, 2, -6], [0.45, 0.42, 2, -8], [0.3, 0.3, 1.6, -9.8]]   // tail
-    .forEach(([w, h, d, z]) => { part(w, h, d, 0, 0.05, z); part(0.14, 0.35, 0.5, 0, h / 2 + 0.17, z, pale); });
-  for (let z = -2.4; z <= 2.5; z += 1.2) part(0.2, 0.5, 0.5, 0, 1.05, z, pale);   // back spikes
-  for (const [x, z] of [[-0.8, 1.8], [0.8, 1.8], [-0.8, -1.8], [0.8, -1.8]]) part(0.5, 1.2, 0.6, x, -1.3, z);   // legs
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd08cff });
-  for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.26, 0.5), eyeMat);
-    eye.position.set(s * 0.72, 0.8, 5.9); g.add(eye);
-  }
-  // wings: a bony arm plus a membrane, hinged at the body's shoulder
-  const armGeo = new THREE.BoxGeometry(6.5, 0.3, 0.4); armGeo.translate(3.25, 0.1, 1.2);
-  const memGeo = new THREE.BoxGeometry(6.5, 0.08, 3.4); memGeo.translate(3.25, 0, -0.4);
-  const wing = s => {
-    const pivot = new THREE.Group(); pivot.position.set(s * 1, 0.5, 0.6); pivot.scale.x = s;
-    const arm = new THREE.Mesh(armGeo, mat), mem = new THREE.Mesh(memGeo, membrane);
-    arm.castShadow = mem.castShadow = true;
-    pivot.add(arm, mem); g.add(pivot); return pivot;
-  };
-  const wingL = wing(-1), wingR = wing(1);
-  scene.add(g);
-  return { group: g, wings: [{ pivot: wingL, s: -1 }, { pivot: wingR, s: 1 }] };
 })();
+
+// ============ Dragon ============
+// The Ender Dragon: a blocky beast facing +z (head forward). Rigid parts are merged per material (about 30 draw calls)
+// and textured with scales; the jaw, the 7 tail segments (nested pivots) and the wings (shoulder → elbow, with finger
+// bones and a scalloped membrane on each part) move in dragonAnim(). The neck and head never move relative to the
+// body: DRAGON_HEAD / _HALF (the head + snout box) and DRAGON_BODY (bow section) stay true hit boxes. Model units are
+// metres × DF_T.scale in the summit fight.
+const DRAGON_HEAD = new THREE.Vector3(0, 0.55, 5.75), DRAGON_HEAD_HALF = new THREE.Vector3(0.7, 0.65, 1.65);
+const DRAGON_TAIL = { n: 7, len: 0.95, z0: -3.2, y0: 0.05 };   // tail segments: count, length, root
+const dragon = (() => {
+  const rnd = mulberry32(0xD4A6);
+  const scales = px(16, (g, s) => {                             // dark scales with a lighter rim and violet glints
+    g.fillStyle = '#1d1228'; g.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y += 4) for (let x = (y / 4) % 2 * 2; x < s; x += 4) {
+      g.fillStyle = '#2c1c3c'; g.fillRect(x, y, 4, 1); g.fillRect(x, y, 1, 3);
+      g.fillStyle = '#140b1d'; g.fillRect(x + 1, y + 3, 3, 1);
+      if (rnd() < 0.18) { g.fillStyle = '#5b2a7a'; g.fillRect(x + 2, y + 1, 1, 1); }
+    }
+  });
+  const belly = px(16, (g, s) => {                              // ribbed belly plates
+    g.fillStyle = '#4a3a58'; g.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y += 4) { g.fillStyle = '#33263f'; g.fillRect(0, y, s, 1); g.fillStyle = '#5b4a6b'; g.fillRect(0, y + 1, s, 1); }
+  });
+  const membraneTex = px(16, (g, s) => {                        // leathery wing skin with veins
+    g.fillStyle = '#2a1838'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 40; i++) { g.fillStyle = rnd() < 0.5 ? '#321e43' : '#23142f'; g.fillRect(rnd() * s | 0, rnd() * s | 0, 2, 1); }
+    g.fillStyle = '#3d2552'; for (let x = 0; x < s; x += 5) g.fillRect(x, 0, 1, s);
+  });
+  const M = {
+    hide: new THREE.MeshLambertMaterial({ map: scales, emissive: 0x23112f, emissiveIntensity: 0.9 }),
+    mouth: new THREE.MeshLambertMaterial({ color: 0x5a1020, emissive: 0xff6a10, emissiveIntensity: 0 }),   // glows as it opens to fire
+    belly: new THREE.MeshLambertMaterial({ map: belly, emissive: 0x1c1128, emissiveIntensity: 0.8 }),
+    bone: new THREE.MeshLambertMaterial({ color: 0xbfb2c9, emissive: 0x2a2234, emissiveIntensity: 0.7 }),
+    wing: new THREE.MeshLambertMaterial({ map: membraneTex, emissive: 0x1e0f2c, emissiveIntensity: 0.9, side: THREE.DoubleSide }),
+  };
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xf0abfc });
+  // parts: boxes with UVs scaled to one texture tile per model unit, transformed, collected per material
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(1, 1, 1), _p = new THREE.Vector3();
+  const box = (list, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv;
+    const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+    for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0], uv.getY(i) * dims[f][1]); }
+    geo.applyMatrix4(_m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s));
+    list.push(geo);
+  };
+  const bone = (list, a, b, t) => {                             // a box from a to b (thickness t)
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], len = Math.hypot(dx, dy, dz);
+    const geo = new THREE.BoxGeometry(t, t, len);
+    geo.applyMatrix4(_m.compose(_p.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2),
+      _q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(dx, dy, dz).normalize()), _s));
+    list.push(geo);
+  };
+  const mesh = (parent, parts) => {                             // { material: [geos] } → merged meshes on parent
+    for (const [k, list] of Object.entries(parts)) {
+      if (!list.length) continue;
+      const m = new THREE.Mesh(mergeParts(list), k === 'eye' ? eyeMat : M[k]);
+      m.castShadow = k !== 'eye';
+      parent.add(m);
+    }
+  };
+  const g = new THREE.Group();
+  // ---- body, neck, head (rigid)
+  const P = { hide: [], belly: [], bone: [], eye: [], mouth: [] };
+  box(P.hide, 2.3, 1.7, 2.4, 0, 0, 1.6);                         // chest
+  box(P.hide, 2.2, 1.6, 2.2, 0, -0.02, -0.6);                    // middle
+  box(P.hide, 1.9, 1.45, 1.6, 0, 0, -2.4);                       // hips
+  box(P.belly, 1.7, 0.3, 5.6, 0, -0.85, -0.3);                   // belly plates
+  for (let z = -2.8; z <= 2.6; z += 0.9) box(P.bone, 0.18, 0.55 + 0.25 * Math.cos(z * 0.5), 0.45, 0, 0.95, z, -0.35, 0, 0);   // back spikes
+  box(P.hide, 1.1, 1.0, 0.8, 0, 0.3, 3.0);                       // neck
+  box(P.hide, 1.0, 0.95, 0.8, 0, 0.42, 3.6);
+  box(P.hide, 0.95, 0.9, 0.7, 0, 0.55, 4.15);
+  for (const z of [3.0, 3.6, 4.1]) box(P.bone, 0.14, 0.45, 0.35, 0, 0.95, z, -0.4, 0, 0);
+  box(P.hide, 1.4, 1.1, 1.9, 0, 0.65, 5.0);                      // skull
+  box(P.hide, 1.0, 0.55, 1.5, 0, 0.62, 6.6);                     // snout
+  box(P.mouth, 0.8, 0.3, 2.3, 0, 0.32, 5.95);                    // the mouth's inside (seen when the jaw drops)
+  box(P.hide, 1.5, 0.22, 0.6, 0, 1.18, 5.55);                    // brow ridge
+  for (const sx of [-1, 1]) {
+    box(P.bone, 0.18, 0.16, 0.22, sx * 0.28, 0.95, 7.25);        // nostrils
+    box(P.bone, 0.3, 0.3, 1.0, sx * 0.5, 1.3, 4.35, 0.55, sx * 0.25, 0);   // horns, swept back …
+    box(P.bone, 0.2, 0.22, 0.9, sx * 0.62, 1.62, 3.65, 0.95, sx * 0.3, 0);   // … and up
+    box(P.bone, 0.12, 0.14, 0.5, sx * 0.7, 1.95, 3.15, 1.35, sx * 0.3, 0);
+    for (let k = 0; k < 4; k++) box(P.bone, 0.1, 0.22, 0.1, sx * 0.4, 0.27, 6.0 + k * 0.4);   // upper teeth
+    box(P.eye, 0.08, 0.24, 0.6, sx * 0.71, 0.86, 5.35);          // eyes
+    box(P.eye, 0.06, 0.12, 0.3, sx * 0.72, 0.86, 5.78);
+    // legs, tucked back for flight: thigh, shin, foot with claws
+    for (const [z, k] of [[1.5, 0.85], [-2.3, 1]]) {
+      box(P.hide, 0.55 * k, 1.0 * k, 0.75 * k, sx * 0.95, -0.95, z, 0.6, 0, 0);
+      box(P.hide, 0.42 * k, 0.9 * k, 0.45 * k, sx * 0.95, -1.55, z - 0.55, 1.1, 0, 0);
+      for (const cx of [-0.13, 0, 0.13]) box(P.bone, 0.08, 0.08, 0.35, sx * 0.95 + cx, -1.85, z - 1.05, 0.3, 0, 0);
+    }
+  }
+  mesh(g, P);
+  // ---- jaw (opens: rotation.x > 0)
+  const jaw = new THREE.Group(); jaw.position.set(0, 0.22, 4.6); g.add(jaw);   // hinged at the back of the skull
+  const J = { hide: [], bone: [] };
+  box(J.hide, 0.95, 0.28, 2.6, 0, 0, 1.3);
+  for (const sx of [-1, 1]) for (let k = 0; k < 4; k++) box(J.bone, 0.09, 0.2, 0.09, sx * 0.36, 0.2, 1.35 + k * 0.4);
+  mesh(jaw, J);
+  // ---- tail: nested pivots, each segment from its pivot back along -z
+  const tail = [];
+  let parent = g;
+  for (let i = 0; i < DRAGON_TAIL.n; i++) {
+    const k = 1 - i / DRAGON_TAIL.n, pv = new THREE.Group(), T = { hide: [], bone: [] };
+    pv.position.set(0, i ? 0 : DRAGON_TAIL.y0, i ? -DRAGON_TAIL.len : DRAGON_TAIL.z0);
+    box(T.hide, 0.3 + 0.62 * k, 0.28 + 0.55 * k, DRAGON_TAIL.len + 0.06, 0, 0, -DRAGON_TAIL.len / 2);
+    box(T.bone, 0.12, 0.25 + 0.3 * k, 0.4, 0, 0.18 + 0.32 * k, -DRAGON_TAIL.len / 2, -0.45, 0, 0);
+    if (i === DRAGON_TAIL.n - 1) {                                // a blade at the tip
+      box(T.bone, 0.9, 0.1, 0.8, 0, 0, -DRAGON_TAIL.len - 0.3, 0, Math.PI / 4, 0);
+    }
+    mesh(pv, T);
+    parent.add(pv); tail.push(pv); parent = pv;
+  }
+  // ---- wings: shoulder pivot (upper arm + inner membrane) → elbow pivot (forearm, 3 fingers, outer membrane)
+  const membrane = (pts, c) => {                                 // a flat fan round c through the outline pts ([x, z] in y = 0)
+    const v = [], uv = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      v.push(c[0], 0, c[1], a[0], 0, a[1], b[0], 0, b[1]);
+      uv.push(c[0] / 2, c[1] / 2, a[0] / 2, a[1] / 2, b[0] / 2, b[1] / 2);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.computeVertexNormals();
+    return geo;
+  };
+  const wing = s => {
+    const sh = new THREE.Group(); sh.position.set(s * 1.05, 0.62, 1.55); sh.scale.x = s; g.add(sh);
+    const U = { bone: [], wing: [] };
+    bone(U.bone, [0, 0, 0], [3.0, 0.1, 0.1], 0.36);
+    U.wing.push(membrane([[0, 0.2], [3.0, 0.1], [3.0, -3.5], [1.6, -3.3], [0, -3.9]], [1.4, -1.6]));
+    mesh(sh, U);
+    const el = new THREE.Group(); el.position.set(3.0, 0.1, 0.1); sh.add(el);
+    const F = { bone: [], wing: [] };
+    const wr = [3.3, 0.05, 0.25], f1 = [7.4, 0, -0.9], f2 = [6.3, 0, -3.1], f3 = [4.4, 0, -4.2];
+    bone(F.bone, [0, 0, 0], wr, 0.3);
+    bone(F.bone, wr, f1, 0.16); bone(F.bone, wr, f2, 0.15); bone(F.bone, wr, f3, 0.14);
+    bone(F.bone, wr, [wr[0] + 0.5, 0.25, wr[2] + 0.45], 0.14);   // thumb claw
+    F.wing.push(membrane([[0, 0.1], [wr[0], wr[2]], [f1[0], f1[2]], [5.9, -1.6], [f2[0], f2[2]], [4.9, -3.0], [f3[0], f3[2]],
+                          [2.4, -3.2], [0, -3.6]], [3.4, -1.7]));
+    mesh(el, F);
+    return { pivot: sh, elbow: el, s };
+  };
+  const wings = [wing(-1), wing(1)];
+  g.traverse(o => { if (o.isMesh && o.material !== eyeMat) o.castShadow = true; });
+  scene.add(g);
+  return { group: g, wings, jaw, tail, mouth: M.mouth };
+})();
+// the pose: wings (flap / glide / tucked for a dive / half-folded when perched), tail sway, jaw. mode: 'fly' 'dive'
+// 'perch'; open: 0..1 jaw; t: seconds (visual clock). tailYaw(i) overrides the sway per segment (the tail lash).
+function dragonAnim(t, mode, open = 0, tailYaw = null) {
+  const perch = mode === 'perch', dive = mode === 'dive';
+  const f = Math.sin(t * (perch ? 1.6 : dive ? 2 : 4.2));
+  for (const w of dragon.wings) {
+    const up = perch ? 0.55 + 0.08 * f : dive ? 0.18 + 0.05 * f : 0.12 + 0.55 * f;
+    w.pivot.rotation.set(0, w.s * (dive ? 0.55 : perch ? 0.35 : 0.05), w.s * up);
+    w.elbow.rotation.set(0, dive ? 0.6 : perch ? 1.15 : 0.08, perch ? -0.7 : dive ? -0.15 : -0.35 * f);   // forearm lags the beat
+  }
+  for (let i = 0; i < dragon.tail.length; i++) {
+    const pv = dragon.tail[i];
+    pv.rotation.y = tailYaw ? tailYaw(i) : Math.sin(t * 1.7 - i * 0.6) * (0.06 + i * 0.025);
+    pv.rotation.x = Math.sin(t * 1.3 - i * 0.5) * 0.04 + (perch ? 0.05 : 0);
+  }
+  dragon.jaw.rotation.x = 0.04 + open * 0.34;
+  dragon.mouth.emissiveIntensity = open * 1.6;
+}
 
 let dragonAng = 0, fireTimer = 3, dragonActive = false;
 const fireballs = [], effects = [];
 let shake = 0;
-const fireballGeo = new THREE.SphereGeometry(0.45, 8, 8);
-const fireballMat = new THREE.MeshBasicMaterial({ color: 0xb14aed });
+// A fireball: a white-hot core in a flickering orange shell and a soft red glow, trailing sparks (fireballFrame)
+const fireballGeo = new THREE.IcosahedronGeometry(0.45, 1);
+const FIRE_MATS = [[0xfff4c2, 0.62, 1], [0xff9a1f, 1, 0.85], [0xff3d00, 1.55, 0.35]].map(([c, r, o]) =>
+  ({ r, m: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }) }));
+function makeFireball(scale = 1) {
+  const g = new THREE.Group();
+  for (const { r, m } of FIRE_MATS) { const s = new THREE.Mesh(fireballGeo, m); s.scale.setScalar(r); g.add(s); }
+  g.scale.setScalar(scale);
+  g.userData.fire = true;
+  return g;
+}
+const _fbP = new THREE.Vector3();
+function fireballFrame(dt, t) {                                // per frame: flicker and sparks for every fireball in flight
+  const balls = typeof DF === 'undefined' ? fireballs : fireballs.concat(DF.balls);
+  for (const b of balls) {
+    const g = b.mesh, k = g.scale.x;
+    g.children.forEach((c, i) => c.scale.setScalar(FIRE_MATS[i].r * (1 + 0.12 * Math.sin(t * (17 + i * 6) + i))));
+    g.children[1].rotation.set(t * 3, t * 4, 0); g.children[2].rotation.set(-t * 2, t * 1.5, 0);
+    _fbP.copy(g.position);
+    for (let n = 0; n < 3; n++)
+      fx.emit(_fbP.x + (Math.random() - 0.5) * 0.6 * k, _fbP.y + (Math.random() - 0.5) * 0.6 * k, _fbP.z + (Math.random() - 0.5) * 0.6 * k,
+        (Math.random() - 0.5) * 1.5, 1 + Math.random() * 1.5, (Math.random() - 0.5) * 1.5, 0.5 + Math.random() * 0.4, 1, n ? 0xff7a1a : 0xffd27a);
+  }
+}
 const warnRingGeo = new THREE.RingGeometry(0.4, 1.2, 20);
 const blastGeo = new THREE.SphereGeometry(1, 8, 6);
 
@@ -6953,6 +7179,7 @@ function explode(pos) {
   e.position.copy(pos);
   scene.add(e);
   effects.push({ mesh: e, t: 0 });
+  fx.burst(pos, 70, 9, 0.9, 1.4, [0xfff2b0, 0xffa020, 0xff5a00, 0xff3000], 4);   // a ball of flame and flying embers
   shake = 0.8;
   sfx(80, 0.4, 'sawtooth', 0.15, 30);
   if (player.pos.distanceTo(pos) < 4) {
@@ -6964,7 +7191,7 @@ function explode(pos) {
 
 function launchFireball(target, dur) {                     // lobbed shot with a pulsing warning ring
   const from = dragon.group.position.clone().add(new THREE.Vector3(0, -1.5, 2));
-  const mesh = new THREE.Mesh(fireballGeo, fireballMat);
+  const mesh = makeFireball(1);
   mesh.position.copy(from);
   const ring = new THREE.Mesh(warnRingGeo, new THREE.MeshBasicMaterial(
     { color: 0xff3c3c, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
@@ -7005,8 +7232,9 @@ function updateDragon(dt, t) {
   dragonActive = !fight && curBiome === BIOME_END && !player.flying;   // never fires at an Elytra flyer
   // the orbit runs on the run clock (elapsed: fixed step only), not the frame's dt: the summit fight starts from it
   if (!fight) { dragonAng = elapsed * CFG.dragonSpeed; dragonLairPose(); }
-  const flap = Math.sin(t * (fight && DF.phase === 'perch' ? 3 : 7)) * 0.5 + 0.1;
-  for (const w of dragon.wings) w.pivot.rotation.z = w.s * flap;
+  if (!fight) dragonAnim(t, 'fly', 0.15 + 0.15 * Math.sin(t * 0.7));
+  fx.step(dt);
+  fireballFrame(dt, t);
 
   if (dragonActive) {
     fireTimer -= dt;
@@ -12814,6 +13042,17 @@ const DF_T = {
   ramKb: [4, 7], ramUp: 6,   // a strafe-pass ram: along / sideways kb, lift (knocks you aside, rarely off the 14 m roof)
   breathAt: 0.9, breathR: 3.5, breathT: 4, breathSlow: 0.5, breathPush: 30, breathPushV: 3,   // dragon's breath (once per perch); the push only steers kb up to breathPushV m/s
   offRoof: 8,             // Normal: this far below the roof during the fight → back on it (see the obstacle below)
+  // tail lash (a strafe pass, after the body has gone by): the chance a pass lashes [Normal, Hardcore], the pass clock
+  // window it whips in, how far each tail segment turns aside (rad, × the swing) and dips (rad × i), the hit, the kb
+  lashP: [0.7, 0.9], lashFrom: 0.42, lashTo: 1, lashYaw: [0.2, 0.24, 0.28, 0.3, 0.3, 0.28, 0.24], lashDip: [0.34, 0.34, 0.3, 0.06, -0.14, -0.2, -0.16],   // dip: steep, then level
+  lashDmg: 6, lashKb: 8, lashUp: 5,
+  // flame sweep: instead of a pass, it may hover at the lane's end (chance [N, H], after the first pass), glow for
+  // flameAim s, then sweep a jet of fire through where you stand (flameLen m long, flameT s), leaving burning patches
+  // (flamePatch s, flamePatchR m) every flameEvery s; standing in fire: flameDps HP/s
+  flameP: [0.35, 0.45], flameIn: 1.4, flameAim: 1.0, flameT: 2.4, flameOut: 1.4, flameR: 1.6, flameLen: 13,
+  flamePatch: 1.3, flamePatchR: 1.1, flameEvery: 0.18, flameDps: 5, hoverR: 15, hoverY: 6.5,
+  // damage to Steve (HP; 2 per heart): a fireball blast at its centre / its edge (4 m), a ram, breath per s, a bed
+  ballDmg: [5, 1.5], ramDmg: 5, breathDps: 1.5, bedDmg: [5, 1],
 };
 // the pillars [dx, dz from the summit flag, top above the roof, caged]: one per diagonal, ≥ 10 m out from the roof's
 // edge and ≥ 7 m up (no jump reaches them), clear of the dragon's lanes and the approach stairs (+z)
@@ -12825,7 +13064,9 @@ const DF = { built: false, active: false, dead: false, phase: '', t: 0, hp: 1, h
              head: new THREE.Vector3(), crumbleT: -1, flash: 0,
              sp: '', st: 0, pa: new THREE.Vector3(), pb: new THREE.Vector3(), touchT: 0,   // strafe: sub-phase, its clock, pass ends
              breath: null, breathed: false, inBreath: false, breathMsgT: 0,
-             perchHurt: 0, noMelee: 0 };                    // arrow damage this perch · no headbutt while a bed blast throws you
+             perchHurt: 0, noMelee: 0, fireAt: -9,
+             passes: 0, noFlame: 0, lash: false, lashSide: 1, lashHit: false, lashMsg: false, lashWind: false, flame: null, patches: [], burnMsgT: -9,
+             tame: false };                                 // tame (tests of the bow fight's mechanics): no hearts, lash or flame                    // arrow damage this perch · no headbutt while a bed blast throws you
 const DF_HUD = { box: document.getElementById('boss'), fill: document.getElementById('boss-fill') };
 const _dfV = new THREE.Vector3(), _dfW = new THREE.Vector3(), _dfZ = new THREE.Vector3(0, 0, 1), _dfInv = new THREE.Matrix4();
 const dfCrystalGeo = new THREE.OctahedronGeometry(0.75);
@@ -12924,6 +13165,7 @@ function startDragonFight() {
   renderSplits();
   DF_HUD.box.style.display = 'block';
   dfBar();
+  heartsStart();
   bowGive('🐉 The Ender Dragon! Shoot the 4 crystals off the pillars — the caged ones take 3 arrows to break out');
   sfx(70, 1.2, 'sawtooth', 0.14, 40); sfx(140, 0.9, 'square', 0.06, 60);
 }
@@ -12954,13 +13196,14 @@ function dfFire() {
   let ty = topAt(tx, tz, P.y + 3);
   if (!isFinite(ty) || ty < P.y - 8) ty = P.y;                  // over the void: burst at the player's height
   const from = dragon.group.position.clone();
-  const mesh = new THREE.Mesh(fireballGeo, fireballMat);
-  mesh.position.copy(from); mesh.scale.setScalar(1.6);
+  const mesh = makeFireball(1.6);
+  mesh.position.copy(from);
   const ring = new THREE.Mesh(warnRingGeo, new THREE.MeshBasicMaterial({ color: 0xff3c3c, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.scale.setScalar(2.2);
   ring.position.set(tx, ty + 0.06, tz);
   scene.add(mesh, ring);
   DF.balls.push({ mesh, ring, from, target: new THREE.Vector3(tx, ty, tz), t: 0, dur: DF_T.fireDur[dfHard()] });
+  DF.fireAt = simT;
   sfx(90, 0.4, 'sawtooth', 0.12, 40);
 }
 function dfClearBalls() {
@@ -12971,6 +13214,7 @@ function dfPopBall(i) {                                       // an arrow bursts
   const b = DF.balls[i];
   scene.remove(b.mesh, b.ring); b.ring.material.dispose(); DF.balls.splice(i, 1);
   explode(b.mesh.position);                                   // its blast (knockback only if you stand within 4 m)
+  heroBlast(b.mesh.position, DF_T.ballDmg, 4, '🔥 Fireball');
   sfx(700, 0.12, 'square', 0.06, 1400);
 }
 function dfBalls(h) {
@@ -12980,6 +13224,7 @@ function dfBalls(h) {
     if (b.t >= 1) {
       scene.remove(b.mesh, b.ring); b.ring.material.dispose(); DF.balls.splice(i, 1);
       explode(b.target);                                       // knockback within 4 m (it can blow you off the roof)
+      heroBlast(b.target, DF_T.ballDmg, 4, '🔥 Fireball');
       continue;
     }
     b.mesh.position.lerpVectors(b.from, b.target, b.t);
@@ -13079,6 +13324,8 @@ function dfDefeat(instant) {
   }
   dragon.group.visible = false;
   DF_HUD.box.style.display = 'none';
+  heartsEnd();
+  DF.patches.length = 0; DF.flame = null;
   if (instant) dfCrumble(); else DF.crumbleT = 1.8;
   equipElytra();
   flashMessage('🐉 The Ender Dragon is defeated! 🪽 The Elytra is yours — fly the gates home');
@@ -13136,6 +13383,7 @@ function dfBreathStep(h) {                                    // inside: slowed 
     const along = player.kb.x * _dfW.x + player.kb.z * _dfW.z;
     if (along < DF_T.breathPushV) { const dv = Math.min(DF_T.breathPushV - along, DF_T.breathPush * h); player.kb.x += _dfW.x * dv; player.kb.z += _dfW.z * dv; }
     if (simT - DF.breathMsgT > 3) { DF.breathMsgT = simT; flashMessage("💜 Dragon's breath!"); sfx(120, 0.3, 'sawtooth', 0.05, 80); }
+    heroDot(DF_T.breathDps * h, "💜 Dragon's breath");
   }
 }
 function dfBreathDraw(vt) {                                   // per frame: the particles swirl and rise
@@ -13165,8 +13413,12 @@ function dfStrafe(h, hard) {
     DF.fireT -= h;
     if (DF.fireT <= 0) { dfFire(); DF.fireT = DF_T.fire[hard] * (0.8 + 0.4 * DF.rnd()); }
     const lane = Math.round(DF.ang / (Math.PI / 2)) * (Math.PI / 2);   // ±x / ±z: the lanes between the pillars
-    if (DF.st >= DF_T.strafeGap[hard] && Math.abs(DF.ang - lane) < 0.06) {
+    if (DF.st >= DF_T.strafeGap[hard] && Math.abs(DF.ang - lane) < 0.06 && !DF.tame && DF.passes > 0 && (DF.noFlame >= 2 || DF.rnd() < DF_T.flameP[hard])) {
+      dfFlameStart(lane);                                     // this lap: hover at the lane's end and breathe fire
+    } else if (DF.st >= DF_T.strafeGap[hard] && Math.abs(DF.ang - lane) < 0.06) {
       const ux = Math.cos(lane), uz = Math.sin(lane), off = (DF.rnd() - 0.5) * 3, R0 = DF_T.passR;
+      DF.lash = !DF.tame && DF.passes > 0 && DF.rnd() < DF_T.lashP[hard];   // (the first pass never lashes: learn the ram first)
+      DF.lashHit = false; DF.passes++; DF.noFlame++;
       DF.pa.set(S.x + ux * R0 - uz * off, T + DF_T.passY + 0.8, S.z + uz * R0 + ux * off);
       DF.pb.set(S.x - ux * R0 - uz * off, T + DF_T.passY - 0.3, S.z - uz * R0 + ux * off);
       DF.from.copy(dragon.group.position); DF.sp = 'dive'; DF.st = 0; DF.ang = lane;
@@ -13183,6 +13435,7 @@ function dfStrafe(h, hard) {
     const u = Math.min(1, DF.st / DF_T.passT);
     _dfV.lerpVectors(DF.pa, DF.pb, u);
     dfPose(_dfV, DF.pb.x - DF.pa.x, DF.pb.z - DF.pa.z);
+    if (DF.lash) dfLash(u);
     DF.touchT -= h;
     if (DF.touchT <= 0) {                                     // body touch: knocked aside (and maybe off the roof)
       dragon.group.updateMatrixWorld();
@@ -13196,9 +13449,12 @@ function dfStrafe(h, hard) {
         DF.touchT = 1; shake = 0.7;
         sfx(70, 0.5, 'sawtooth', 0.14, 40);
         flashMessage('💢 Rammed by the dragon! Sidestep its dives');
+        heroHurt(DF_T.ramDmg, '💢 Rammed');
       }
     }
-    if (u >= 1) { DF.sp = 'climb'; DF.st = 0; DF.fireT = DF_T.climbT * 0.45; DF.from.copy(DF.pb); DF.ang += Math.PI; }
+    if (u >= 1) { DF.sp = 'climb'; DF.st = 0; DF.fireT = DF_T.climbT * 0.45; DF.from.copy(DF.pb); DF.ang += Math.PI; DF.lash = false; }
+  } else if (DF.sp === 'hover') {
+    dfFlameStep(h);
   } else if (DF.sp === 'climb') {                             // out along the lane and back up to the circle, firing once
     const u = Math.min(1, DF.st / DF_T.climbT);
     dfCirclePos(DF.ang, DF.to);
@@ -13315,16 +13571,163 @@ function dfStep(h) {
   dfBreathStep(h);
 }
 
+// ---- tail lash: during a pass (pass clock u) the tail curls out ~100° to the side Steve stepped to and dips, so it
+// sweeps low across that side of the roof as the body flies on: sidestep the body, then jump the tail. Its pose is set
+// on the tail pivots here (dragonAnim shows the same pose via dfLashYaw), and the hit test reads the pivots' world
+// positions: jump over it, or take DF_T.lashDmg and a kb out to the side.
+const _lA = new THREE.Vector3(), _lB = new THREE.Vector3(), _lTip = new THREE.Vector3(0, 0, -DRAGON_TAIL.len);
+function dfLashAmt(u) {                                       // → [curl 0…1 (toward lashSide), dip −0.4…1]; null outside
+  if (u < DF_T.lashFrom - 0.15 || u > DF_T.lashTo) return null;
+  if (u < DF_T.lashFrom) { const w = 1 - (DF_T.lashFrom - u) / 0.15; return [w, -0.4 * w]; }   // wind-up: curls out, lifts
+  const q = (u - DF_T.lashFrom) / (DF_T.lashTo - DF_T.lashFrom);
+  return [1, Math.min(1, q * 8, (1 - q) * 6)];                  // slams down, sweeps, lifts off at the end
+}
+function dfLashPose(u) {                                      // the pivots' rotations for pass clock u (true if lashing)
+  const a = dfLashAmt(u);
+  if (!a) return false;
+  for (let i = 0; i < dragon.tail.length; i++) {
+    dragon.tail[i].rotation.y = DF.lashSide * a[0] * DF_T.lashYaw[i];
+    dragon.tail[i].rotation.x = -a[1] * DF_T.lashDip[i];       // (nested pivots: the angles add up toward the tip)
+  }
+  return true;
+}
+function dfLash(u) {
+  const P = player.pos;
+  if (u < DF_T.lashFrom - 0.15) {                              // before the wind-up: note which side of the lane Steve is on
+    _dfW.subVectors(DF.pb, DF.pa).setY(0).normalize();
+    DF.lashSide = (P.x - _dfV.x) * -_dfW.z + (P.z - _dfV.z) * _dfW.x >= 0 ? 1 : -1;
+    DF.lashWind = false;
+    return;
+  }
+  if (!DF.lashWind) {                                         // the wind-up: a whoosh (and, the first time, a warning)
+    DF.lashWind = true;
+    sfx(90, 0.6, 'sawtooth', 0.08, 300);
+    if (!DF.lashMsg) { DF.lashMsg = true; flashMessage('🐉 Tail lash — jump over it!'); }
+  }
+  if (!dfLashPose(u) || DF.lashHit) return;
+  dragon.group.updateMatrixWorld(true);
+  const k = DF_T.scale;
+  for (let i = 0; i < dragon.tail.length; i++) {              // each segment: pivot → next pivot (or the tip)
+    dragon.tail[i].getWorldPosition(_lA);
+    if (i + 1 < dragon.tail.length) dragon.tail[i + 1].getWorldPosition(_lB); else _lB.copy(_lTip).applyMatrix4(dragon.tail[i].matrixWorld);
+    const sx = _lB.x - _lA.x, sz = _lB.z - _lA.z, L2 = sx * sx + sz * sz;
+    const w = L2 > 1e-9 ? THREE.MathUtils.clamp(((P.x - _lA.x) * sx + (P.z - _lA.z) * sz) / L2, 0, 1) : 0;
+    const cx = _lA.x + sx * w, cz = _lA.z + sz * w, cy = _lA.y + (_lB.y - _lA.y) * w;
+    const half = (0.15 + 0.31 * (1 - i / dragon.tail.length)) * k;      // half the segment's thickness
+    if (Math.hypot(P.x - cx, P.z - cz) < half + 0.4 && P.y < cy + half && P.y + 1.8 > cy - half) {
+      DF.lashHit = true;
+      _dfW.subVectors(DF.pb, DF.pa).setY(0).normalize();
+      player.kb.set(-_dfW.z * DF.lashSide * DF_T.lashKb, 0, _dfW.x * DF.lashSide * DF_T.lashKb);
+      player.vel.y = Math.max(player.vel.y, DF_T.lashUp); player.grounded = false;
+      shake = 0.8; sfx(55, 0.6, 'sawtooth', 0.16, 30);
+      heroHurt(DF_T.lashDmg, '🐉 Tail lash');
+      return;
+    }
+  }
+}
+// the visual pose of the tail while it lashes (null: the idle sway)
+function dfLashYaw() {
+  if (!DF.active || !DF.lash || DF.sp !== 'pass') return null;
+  const a = dfLashAmt(Math.min(1, DF.st / DF_T.passT));
+  return a ? i => DF.lashSide * a[0] * DF_T.lashYaw[i] : null;
+}
+
+// ---- flame sweep: hover at the lane's end facing the roof, glow, then sweep a jet of fire through Steve's spot
+function dfFlameStart(lane) {
+  const S = summitFlagPos, T = COURSE.summitTop, ux = Math.cos(lane), uz = Math.sin(lane);
+  DF.sp = 'hover'; DF.st = 0; DF.ang = lane; DF.noFlame = 0;
+  DF.from.copy(dragon.group.position);
+  DF.to.set(S.x + ux * DF_T.hoverR, T + DF_T.hoverY, S.z + uz * DF_T.hoverR);
+  DF.flame = { stage: 'in', ux, uz, a: new THREE.Vector3(), b: new THREE.Vector3(), p: new THREE.Vector3(), lastPatch: 0 };
+  flashMessage('🔥 It hovers — get out of the fire\'s path!');
+  sfx(70, 1.2, 'sawtooth', 0.1, 120);
+}
+function dfFlameStep(h) {
+  const F = DF.flame, S = summitFlagPos, T = COURSE.summitTop, P = player.pos;
+  if (F.stage === 'in') {                                     // fly to the hover spot, turning to the roof
+    const u = dfSmooth(DF.st / DF_T.flameIn);
+    _dfV.lerpVectors(DF.from, DF.to, u);
+    dfPose(_dfV, u < 0.5 ? DF.to.x - DF.from.x : -F.ux, u < 0.5 ? DF.to.z - DF.from.z : -F.uz);
+    if (DF.st >= DF_T.flameIn) {                               // aim: a line across the roof through Steve, at right angles to the jet
+      F.stage = 'aim'; DF.st = 0; DF.fireAt = simT + DF_T.flameAim;
+      const px = THREE.MathUtils.clamp(P.x, S.x - 6.5, S.x + 6.5), pz = THREE.MathUtils.clamp(P.z, S.z - 6.5, S.z + 6.5);
+      const L = DF_T.flameLen / 2, side = DF.rnd() < 0.5 ? 1 : -1;
+      F.a.set(px - F.uz * L * side, T, pz + F.ux * L * side); F.b.set(px + F.uz * L * side, T, pz - F.ux * L * side);
+      sfx(110, DF_T.flameAim, 'sawtooth', 0.07, 260);             // the roar builds
+    }
+  } else if (F.stage === 'aim') {
+    _dfV.copy(DF.to); _dfV.y += Math.sin(DF.st * 3) * 0.3;
+    dfPose(_dfV, -F.ux, -F.uz);
+    DF.fireAt = simT;                                           // jaw open, mouth glowing
+    if (DF.st >= DF_T.flameAim) { F.stage = 'burn'; DF.st = 0; F.lastPatch = -1; sfx(60, DF_T.flameT, 'sawtooth', 0.12, 50); }
+  } else if (F.stage === 'burn') {
+    const u = Math.min(1, DF.st / DF_T.flameT);
+    _dfV.copy(DF.to); dfPose(_dfV, -F.ux, -F.uz);
+    DF.fireAt = simT;
+    F.p.lerpVectors(F.a, F.b, u);
+    if (DF.st - F.lastPatch >= DF_T.flameEvery && Math.abs(F.p.x - S.x) < 7 && Math.abs(F.p.z - S.z) < 7) {
+      F.lastPatch = DF.st;
+      DF.patches.push({ x: F.p.x, z: F.p.z, t: 0 });
+    }
+    if (u >= 1) { F.stage = 'out'; DF.st = 0; }
+  } else if (F.stage === 'out') {                              // back up to the circle (as after a pass)
+    DF.flame = null;
+    DF.sp = 'climb'; DF.st = 0; DF.fireT = 99; DF.from.copy(dragon.group.position); DF.pa.copy(dragon.group.position); DF.pb.copy(dragon.group.position);
+    return;
+  }
+  // Steve in the jet's spot or a burning patch: he burns
+  let burn = F.stage === 'burn' && Math.hypot(P.x - F.p.x, P.z - F.p.z) < DF_T.flameR && P.y < T + 2.2 && P.y > T - 1;
+  for (const q of DF.patches) if (!burn && Math.hypot(P.x - q.x, P.z - q.z) < DF_T.flamePatchR && P.y < T + 1.6 && P.y > T - 1) burn = true;
+  if (burn) heroBurn(h);
+}
+function dfPatchesStep(h) {                                   // burning patches die down (also after the hover ends)
+  for (let i = DF.patches.length - 1; i >= 0; i--) if ((DF.patches[i].t += h) >= DF_T.flamePatch) DF.patches.splice(i, 1);
+  if (!DF.flame && DF.patches.length) {
+    const P = player.pos, T = COURSE.summitTop;
+    for (const q of DF.patches) if (Math.hypot(P.x - q.x, P.z - q.z) < DF_T.flamePatchR && P.y < T + 1.6 && P.y > T - 1) { heroBurn(h); break; }
+  }
+}
+function heroBurn(h) {
+  if (simT - DF.burnMsgT > 2.5) { DF.burnMsgT = simT; flashMessage('🔥 Burning! Get out of the fire!'); }
+  heroDot(DF_T.flameDps * h, '🔥 Burnt to a crisp');
+}
+const _flM = new THREE.Vector3(), _flMouth = new THREE.Vector3(0, 0.35, 7.4);
+function dfFlameDraw(dt) {                                    // per frame: the jet (sparks from the mouth to the spot) and patches
+  const F = DF.flame;
+  if (F && (F.stage === 'burn' || F.stage === 'aim')) {
+    _flM.copy(_flMouth).applyMatrix4(dragon.group.matrixWorld);
+    if (F.stage === 'aim') {
+      for (let n = 0; n < 3; n++) fx.emit(_flM.x, _flM.y, _flM.z, (Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2, 0.35, 1.2, 0xffb040);
+    } else {
+      const tx = F.p.x - _flM.x, ty = F.p.y + 0.3 - _flM.y, tz = F.p.z - _flM.z, tt = 0.42;
+      for (let n = 0; n < 26; n++) {
+        const j = 0.18 + Math.random() * 0.12;
+        fx.emit(_flM.x, _flM.y, _flM.z, tx / tt + (Math.random() - 0.5) * 3, ty / tt + (Math.random() - 0.5) * 3, tz / tt + (Math.random() - 0.5) * 3,
+          tt * (0.8 + Math.random() * 0.4), 1.6, n % 3 ? 0xff8a1a : 0xffe08a);
+        if (n < 8) fx.emit(F.p.x + (Math.random() - 0.5) * 2.2, F.p.y + 0.1, F.p.z + (Math.random() - 0.5) * 2.2, 0, 3 + Math.random() * 3, 0, j * 3, 1.6, 0xff6a10);
+      }
+    }
+  }
+  for (const q of DF.patches) {
+    const k = 1 - q.t / DF_T.flamePatch;
+    for (let n = 0; n < 2; n++)
+      fx.emit(q.x + (Math.random() - 0.5) * 1.8, COURSE.summitTop + 0.1, q.z + (Math.random() - 0.5) * 1.8, 0, 2 + Math.random() * 3 * k, 0, 0.45, 1.3 * k + 0.3, n ? 0xff5a00 : 0xffa030);
+  }
+}
+
 addObstacle({
   name: 'dragonFight',
   update(h) {
     if (!DF.built && ELY.built) buildDragonArena();             // after the Elytra course (its gates ignore the pillars)
     dfStep(h);
+    if (DF.active) { dfPatchesStep(h); heartsStep(h); }
     // Normal: the roof is the arena — knocked off it (a ram, a blast, a bed), you're back on it as soon as you drop
-    // DF_T.offRoof below it, not stranded on the tower's ledges above the usual fall reset
-    if (DF.active && !HARDCORE && !dying && player.pos.y < COURSE.summitTop - DF_T.offRoof) toCheckpoint('💨 Knocked off the roof! Back up…');
+    // DF_T.offRoof below it, not stranded on the tower's ledges above the usual fall reset. The climb costs HP.FALL.
+    if (DF.active && !HARDCORE && !dying && player.pos.y < COURSE.summitTop - DF_T.offRoof) {
+      if (!heroHurt(HP.FALL, '💨 A fall', true)) toCheckpoint('💨 Knocked off the roof! Back up… (-1 ♥)');
+    }
   },
-  onRespawn() { if (DF.active) { dfClearBalls(); dfClearBreath(); } },   // Normal: back on the roof, the fight goes on
+  onRespawn() { if (DF.active) { dfClearBalls(); dfClearBreath(); DF.patches.length = 0; if (DF.flame) DF.flame.stage = 'out'; } },   // back on the roof, the fight goes on
 });
 // ==== FINALE: dragon fight (end) ====
 
@@ -13355,13 +13758,19 @@ addObstacle({
 //   bowTargets()                → world points: crystals [{ i, alive, caged, pos }], head, body, balls, beds, phase
 const BOW = {
   DRAW: 1.0, MIN: 0.2, V0: 28, V1: 42, G: 10, STICK: 3, LIFE: 4, RANGE: 150,   // draw time, min charge, speed, gravity, arrow life
-  WALK: 0.45, PITCH_MIN: -1.0, CAM_RIGHT: 0.8, CAM_BACK: 3, CAM_UP: 1.5, FOV: 60,
+  WALK: 0.45, PITCH_MIN: -0.8, CAM_RIGHT: 0.9, CAM_BACK: 6.5, CAM_UP: 1.5, CAM_PMIN: -0.1, CAM_TILT: 0.3, FOV: 62, FOV_WIDE: 72,
+  // the boss camera: CAM_BACK m behind, CAM_RIGHT m right, never far below shoulder height (CAM_PMIN), looking CAM_TILT
+  // rad lower than the aim so Steve and the roof stay in view while aiming up; the crosshair sits that angle above the
+  // screen centre, so it still marks the aim ray exactly. FOV_WIDE in the fight, FOV while drawing.
+  ASSIST_CONE: 0.13, ASSIST_RATE: 1.6, LOCK_RATE: 7, EDGE: 0.35,   // aim assist (rad, rad/s) · lock-on turn rate · edge guard margin
   BODY_DMG: 0.035, HEAD_DMG: 0.07, MIN_K: 0.3, PERCH_HEAD: 1.5, HARD_K: 0.65,  // × max(charge, MIN_K); perched head × PERCH_HEAD · Hardcore × HARD_K
   HEAL: 0.02, CAGE_HITS: 3, REGROW: 30, CRYSTAL_R: 0.9, BALL_R: 1.0, // per live crystal per s · cage · Hardcore regrowth · hit radii
   BED_DMG: 0.35, BED_R: 5, BED_HEAD: 7, BED_USE: 2.5, BED_KB: 16,    // bed: damage, knockback radius, head reach, use distance, push
   HEADSHOT_GAP: 1.5, EPS: 1e-9,                                    // charge ≥ MIN - EPS: 24 steps of 1/120 sum to 0.19999…
+  TIRED_N: 6, TIRED_WIN: 10, TIRED_T: 8, TIRED_K: 0.5,             // tired arms: N misses within WIN s → damage × K for T s
 };
-const BS = { has: false, drawing: false, charge: 0, aiming: false, shots: 0, hits: 0, headHits: 0, arrows: [],
+const BS = { has: false, drawing: false, charge: 0, aiming: false, shots: 0, hits: 0, headHits: 0, arrows: [], misses: [], tiredT: 0,
+             lock: null, lockReq: false, assistT: null, assistTest: false,
              ePrev: false, bedTip: false, hsT: -9, camK: 0, fovOwn: false, msg: '', msgT: 0, fx: [] };
 
 // ---- models: a pixel bow (two limbs that bend with the draw, a string, a nocked arrow) and the arrows
@@ -13423,13 +13832,22 @@ const _bH = new THREE.Vector3(), _bT = new THREE.Vector3(), _bD = new THREE.Vect
 const _bS = new THREE.Vector3(), _bO = new THREE.Vector3(), _bV = new THREE.Vector3(), _bHd = new THREE.Vector3();
 const bowView = (y, p, out) => out.set(-Math.sin(y) * Math.cos(p), -Math.sin(p), -Math.cos(y) * Math.cos(p));
 function bowCam(P, y, p, out) {
-  const pc = THREE.MathUtils.clamp(p, -0.35, 1.1);            // looking up keeps the camera behind the shoulder
+  const pc = THREE.MathUtils.clamp(p, BOW.CAM_PMIN, 1.1);     // looking up keeps the camera about shoulder high
   _bPiv.set(P.x, P.y + BOW.CAM_UP, P.z);
   _bW.set(Math.cos(y) * BOW.CAM_RIGHT + Math.sin(y) * Math.cos(pc) * BOW.CAM_BACK, Math.sin(pc) * BOW.CAM_BACK,
           -Math.sin(y) * BOW.CAM_RIGHT + Math.cos(y) * Math.cos(pc) * BOW.CAM_BACK);
   const len = _bW.length();
   _bW.multiplyScalar(1 / len);
-  return out.copy(_bPiv).addScaledVector(_bW, Math.max(Math.min(CAM_MIN, len), camRayStatic(_bPiv, _bW, len)));
+  return out.copy(_bPiv).addScaledVector(_bW, Math.max(Math.min(CAM_MIN, len), Math.min(camRayStatic(_bPiv, _bW, len), camRayPillars(_bPiv, _bW, len))));
+}
+function camRayPillars(o, d, len) {                           // the fight's obsidian pillars (platform colliders) block the camera too
+  let best = len;
+  for (const p of DF.pillars) {
+    if (p.fallen) continue;
+    const c = p.mesh.position, t = rayBox(o.x - c.x, o.y - c.y, o.z - c.z, d.x, d.y, d.z, p.w / 2 + CAM_PAD, p.h / 2, p.d / 2 + CAM_PAD, best);
+    if (t > 0 && t < best) best = t;
+  }
+  return best;
 }
 function bowHand(P, y, p, out) {                              // right shoulder + 0.75 m along the aim
   bowView(y, p, _bD);
@@ -13551,10 +13969,22 @@ function bowSpark(pos, color) {                               // a small burst w
   m.position.copy(pos); m.scale.setScalar(0.2); scene.add(m);
   BS.fx.push({ m, t: 0 });
 }
+// tired arms: too many misses in a row of seconds weaken the arrows for a while
+function bowMiss() {
+  if (DF.tame || !DF.active) return;
+  BS.misses.push(simT);
+  while (BS.misses.length && simT - BS.misses[0] > BOW.TIRED_WIN) BS.misses.shift();
+  if (BS.tiredT <= 0 && BS.misses.length >= BOW.TIRED_N) {
+    BS.tiredT = BOW.TIRED_T; BS.misses.length = 0;
+    flashMessage(`😮‍💨 Tired arms! Too many misses — arrows do half damage for ${BOW.TIRED_T} s`);
+    sfx(180, 0.5, 'triangle', 0.06, 90);
+  }
+}
 function bowHurt(d) { if (DF.phase === 'perch') DF.perchHurt += d; dfDamage(d); }   // (a perch ends at DF_T.perchCap)
 function bowImpact(a, i, hit) {
-  const k = Math.max(a.charge, BOW.MIN_K) * (HARDCORE ? BOW.HARD_K : 1);   // Hardcore: a tougher hide (pacing 80–130 s)
+  const k = Math.max(a.charge, BOW.MIN_K) * (HARDCORE ? BOW.HARD_K : 1) * (BS.tiredT > 0 ? BOW.TIRED_K : 1);   // Hardcore: a tougher hide (pacing 80–130 s)
   if (hit.kind === 'solid') {                                 // stuck in the block for BOW.STICK s (pos: where the tip hit)
+    bowMiss();
     a.mesh.position.copy(a.pos);
     if (a.vel.lengthSq() > 1e-6) {                            // posed here (bowFrame only moves / turns arrows in flight):
       _bO.copy(a.vel).normalize();                            // along its flight, head ~0.18 m into the block, the shaft out
@@ -13593,7 +14023,7 @@ function bowArrows(h) {
     const a = BS.arrows[i];
     a.t += h;
     if (a.stuck) { if (a.t >= BOW.STICK) bowDrop(i); continue; }
-    if (a.t >= BOW.LIFE) { bowDrop(i); continue; }
+    if (a.t >= BOW.LIFE) { bowDrop(i); bowMiss(); continue; }
     a.vel.y -= BOW.G * h;
     _bD.copy(a.vel).multiplyScalar(h);                        // this step's segment, swept against everything
     const hit = bowCast(a.pos, _bD, 1);
@@ -13644,6 +14074,7 @@ function bowBedBoom(b) {
       _bW.normalize();
     }
     player.kb.copy(_bW.multiplyScalar(BOW.BED_KB * (1 - 0.5 * d / BOW.BED_R)));
+    heroHurt(THREE.MathUtils.lerp(DF_T.bedDmg[0], DF_T.bedDmg[1], d / BOW.BED_R), '🛏 Bed blast');
     player.vel.y = Math.max(player.vel.y, 9); player.grounded = false;
     DF.noMelee = 0.8;                                         // the blast's flight never counts as a headbutt
   }
@@ -13660,11 +14091,11 @@ function bowGive(msg) {
   BS.has = true; BS.drawing = BS.aiming = false; BS.charge = 0; BS.fovOwn = true;
   pitchMin = BOW.PITCH_MIN;
   bowModel.g.visible = true;
-  flashMessage('🏹 You found a bow! Hold left-click (or F) to draw, release to shoot — Infinity: arrows never run out');
+  flashMessage('🏹 You found a bow! Hold left-click (or F) to draw, release to shoot — Q locks on. Infinity: arrows never run out');
   BS.msg = msg; BS.msgT = 3.2;                                // the fight's own message follows this one
 }
 function bowTake() {
-  BS.has = BS.drawing = BS.aiming = false; BS.charge = 0; BS.msg = '';
+  BS.has = BS.drawing = BS.aiming = false; BS.charge = 0; BS.msg = ''; BS.tiredT = 0; BS.misses.length = 0; BS.lock = BS.assistT = null;
   pitchMin = -0.25; pitch = Math.max(pitch, pitchMin);
   bowModel.g.visible = false;
   player.speedMul = 1; player.noSprint = false;
@@ -13674,9 +14105,91 @@ function bowTake() {
 function bowCancel() { BS.drawing = false; BS.charge = 0; }  // pause (keys are cleared there too)
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement) { keys.Mouse0 = keys.Mouse2 = false; bowCancel(); } });
 
+// ---- aim help (fixed step, so shots stay deterministic): targets are the dragon (head while perched, else body),
+// live crystals (their cage while caged) and fireballs. bowAimPoint aims ahead of a moving target (its last step's
+// motion × the flight time) and above it (the arrow's drop at the current charge).
+const _baT = new THREE.Vector3(), _baC = new THREE.Vector3(), _baV = new THREE.Vector3(), _baPrev = new THREE.Vector3();
+function bowTargetList() {
+  const out = [];
+  if (DF.active && DF.phase !== 'dying' && dragon.group.visible) {
+    dragon.group.updateMatrixWorld();
+    out.push({ kind: 'dragon', ref: dragon, pos: DF.phase === 'perch' ? dfHeadWorld(new THREE.Vector3()) : dragon.group.position.clone() });
+  }
+  for (const c of DF.crystals) {
+    if (c.cage && c.cage.alive) out.push({ kind: 'cage', ref: c, pos: c.cage.mesh.position.clone() });
+    else if (c.alive) out.push({ kind: 'crystal', ref: c, pos: c.mesh.position.clone() });
+  }
+  for (const b of DF.balls) out.push({ kind: 'ball', ref: b, pos: b.mesh.position.clone() });
+  return out;
+}
+function bowTargetPos(t, out) {                               // where a target is now (a lock follows it: null if it's gone)
+  if (t.kind === 'dragon') return DF.active && DF.phase !== 'dying' ? (DF.phase === 'perch' ? dfHeadWorld(out) : out.copy(dragon.group.position)) : null;
+  if (t.kind === 'cage') return t.ref.cage.alive ? out.copy(t.ref.cage.mesh.position) : t.ref.alive ? out.copy(t.ref.mesh.position) : null;
+  if (t.kind === 'crystal') return t.ref.alive ? out.copy(t.ref.mesh.position) : null;
+  return DF.balls.includes(t.ref) ? out.copy(t.ref.mesh.position) : null;
+}
+function bowAimPoint(t, out) {                                // lead + drop
+  if (!bowTargetPos(t, out)) return null;
+  bowCam(player.pos, yaw, pitch, _baC);
+  const v = BOW.V0 + BOW.V1 * Math.max(BS.charge, 0.6), tf = out.distanceTo(_baC) / v;
+  if (t.prev) { _baV.subVectors(out, t.prev).multiplyScalar(1 / STEP); t.prev.copy(out); out.addScaledVector(_baV, tf); }
+  else t.prev = out.clone();
+  out.y += 0.5 * BOW.G * tf * tf;
+  return out;
+}
+function bowViewTo(p, rate, h) {                              // turn the view toward p from the camera, at most rate·h rad
+  bowCam(player.pos, yaw, pitch, _baC);
+  _baT.subVectors(p, _baC).normalize();
+  const wy = Math.atan2(-_baT.x, -_baT.z), wp = THREE.MathUtils.clamp(-Math.asin(THREE.MathUtils.clamp(_baT.y, -1, 1)), pitchMin, 1.1);
+  const dy = Math.atan2(Math.sin(wy - yaw), Math.cos(wy - yaw)), dp = wp - pitch, d = Math.hypot(dy, dp), m = Math.min(1, rate * h / Math.max(d, 1e-9));
+  yaw += dy * m; pitch += dp * m;
+}
+function bowLockToggle() {
+  if (BS.lock) { BS.lock = null; flashMessage('🎯 Lock-on off'); return; }
+  bowView(yaw, pitch, _bF); bowCam(player.pos, yaw, pitch, _baC);
+  let best = null, bd = Infinity;
+  for (const t of bowTargetList()) {                          // the target nearest the crosshair (not fireballs: they're gone in a second)
+    if (t.kind === 'ball') continue;
+    const d = _baT.subVectors(t.pos, _baC).normalize().angleTo(_bF);
+    if (d < bd) { bd = d; best = t; }
+  }
+  if (!best) return;
+  BS.lock = best;
+  flashMessage(`🎯 Locked on: ${{ dragon: 'the dragon', cage: 'a cage', crystal: 'a crystal', ball: 'a fireball' }[best.kind]} — Q again to let go`);
+  sfx(980, 0.08, 'square', 0.05); sfx(1320, 0.1, 'square', 0.04);
+}
+function bowAssist(h) {
+  if (BS.lock) {                                              // locked: the view tracks the target (with lead and drop)
+    if (!bowAimPoint(BS.lock, _baPrev)) { BS.lock = null; flashMessage('🎯 Target gone — lock-on off'); return; }
+    bowViewTo(_baPrev, BOW.LOCK_RATE, h);
+    return;
+  }
+  if (!BS.drawing || !SET.assist || (navigator.webdriver && !BS.assistTest)) return;
+  bowView(yaw, pitch, _bF); bowCam(player.pos, yaw, pitch, _baC);
+  let best = null, bd = BOW.ASSIST_CONE;
+  for (const t of bowTargetList()) {
+    if (t.kind === 'ball') continue;                          // (fireballs: aim yourself)
+    const d = _baT.subVectors(t.pos, _baC).normalize().angleTo(_bF);
+    if (d < bd) { bd = d; best = t; }
+  }
+  if (!best) { BS.assistT = null; return; }
+  if (!BS.assistT || BS.assistT.ref !== best.ref) BS.assistT = best;
+  if (bowAimPoint(BS.assistT, _baPrev)) bowViewTo(_baPrev, BOW.ASSIST_RATE * (1 - bd / BOW.ASSIST_CONE * 0.6), h);   // gentle: stronger near the target
+}
+// edge guard: while drawing (or locked on) Steve can't walk off the roof; a knockback still throws him
+function bowEdgeGuard() {
+  if (!DF.active || !(BS.drawing || BS.lock) || player.kb.lengthSq() > 4 || dying) return;
+  const S = summitFlagPos, T = COURSE.summitTop, P = player.pos, L = 7 - BOW.EDGE;
+  if (P.y < T - 0.5 || P.y > T + 3) return;                   // (only on the roof)
+  if (Math.abs(P.x - S.x) > L) { P.x = S.x + Math.sign(P.x - S.x) * L; player.vel.x = 0; }
+  if (Math.abs(P.z - S.z) > L) { P.z = S.z + Math.sign(P.z - S.z) * L; player.vel.z = 0; }
+}
+
 function bowStep(h) {
   if (BS.msg && (BS.msgT -= h) <= 0) { flashMessage(BS.msg); BS.msg = ''; }
   const live = BS.has && DF.active && started && !gameOver && !dying && !player.flying;
+  if (BS.lockReq) { BS.lockReq = false; if (live) bowLockToggle(); }
+  if (live) bowAssist(h); else BS.lock = null;
   if (live) {
     if (keys.Mouse0 || keys.KeyF) {
       if (!BS.drawing) { BS.drawing = true; BS.charge = 0; sfx(150, 0.7, 'sawtooth', 0.025, 260); }   // creak
@@ -13691,6 +14204,7 @@ function bowStep(h) {
     if (BS.aiming) player.targetRot = yaw + Math.PI;          // face the aim (movement strafes)
     bowBeds();
   } else if (BS.drawing || BS.aiming) { BS.drawing = BS.aiming = false; BS.charge = 0; }
+  if (BS.tiredT > 0 && (BS.tiredT -= h) <= 0) { BS.tiredT = 0; flashMessage('💪 Your arms recovered — full power again'); sfx(660, 0.2, 'triangle', 0.06); }
   player.speedMul = (BS.drawing ? BOW.WALK : 1) * (DF.inBreath ? DF_T.breathSlow : 1);
   player.noSprint = BS.drawing;
   if (BS.arrows.length) { dragon.group.updateMatrixWorld(); bowArrows(h); }
@@ -13698,6 +14212,7 @@ function bowStep(h) {
 addObstacle({
   name: 'bow',
   update(h) { if (DF.built) bowStep(h); },                    // after the dragon fight's step: it has moved already
+  afterMove(ent) { if (ent === player && BS.has) bowEdgeGuard(); },
   onRespawn() { bowCancel(); },
 });
 
@@ -13715,6 +14230,14 @@ function bowFrame(dt, placed) {
   const fk = DF.flash > 0 ? DF.flash / 0.3 : 0;
   if (fk !== dfFlashShown) { dfMats.forEach((m, i) => m.emissive.copy(dfMatBase[i]).lerp(_dfRed, fk)); dfFlashShown = fk; }
   dfBreathDraw(vt);
+  if (DF.active) {
+    const strafing = (DF.phase === 'strafe' || DF.phase === 'between') && (DF.sp === 'dive' || DF.sp === 'pass');
+    const mode = DF.phase === 'perch' || (DF.phase === 'perchIn' && DF.t > DF_T.perchFly * 0.6) ? 'perch' : strafing ? 'dive' : 'fly';
+    dragonAnim(vt, mode, DF.breath ? 1 : Math.max(0, 1 - (simT - DF.fireAt) * 2.5), dfLashYaw());
+    if (DF.lash && DF.sp === 'pass') dfLashPose(Math.min(1, DF.st / DF_T.passT));   // (pitch too: the sim's pose)
+  }
+  dfFlameDraw(dt);
+  heartsFrame(dt);
   for (const c of DF.crystals) if (c.cage && c.cage.flash > 0) {   // cage hit flash
     c.cage.flash = Math.max(0, c.cage.flash - dt * 4);
     c.cage.mat.emissive.setRGB(0.16 + c.cage.flash * 0.8, 0.16 + c.cage.flash * 0.8, 0.2 + c.cage.flash * 0.8);
@@ -13748,21 +14271,25 @@ function bowFrame(dt, placed) {
     BOW_HUD.meter.classList.toggle('full', BS.charge >= 1);
     BOW_HUD.meter.classList.toggle('weak', BS.charge < BOW.MIN - BOW.EPS);
   }
-  // the camera: blend into the over-the-shoulder aim camera, and the FOV with it
-  const want = !placed && BS.has && !player.flying && !dying && !gameOver && (BS.aiming || pitch < -0.25) ? 1 : 0;
+  // the camera: blend into the boss camera for the whole fight, and the FOV with it
+  const want = !placed && BS.has && DF.active && !player.flying && !dying && !gameOver ? 1 : 0;
   BS.camK = damp(BS.camK, want, 12, dt);
   if (!want && BS.camK < 0.01) BS.camK = 0;
   if (want && BS.camK > 0.995) BS.camK = 1;
   if (BS.fovOwn && !placed) {
-    const fov = BS.has && BS.aiming ? BOW.FOV : 75;
+    const fov = BS.has && BS.aiming ? BOW.FOV : BS.has && DF.active ? BOW.FOV_WIDE : 75;
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = damp(camera.fov, fov, 8, dt); camera.updateProjectionMatrix(); }
     else if (!BS.has) { camera.fov = 75; camera.updateProjectionMatrix(); BS.fovOwn = false; }
   }
+  // the crosshair sits CAM_TILT above the centre in the boss camera (k: the blend), where the aim ray meets the screen
+  const kc = placed ? 0 : dfSmooth(BS.camK), lift = kc * Math.tan(BOW.CAM_TILT) / Math.tan(camera.fov * Math.PI / 360) * innerHeight / 2;
+  BOW_HUD.cross.style.transform = BOW_HUD.meter.style.transform = lift > 0.5 ? `translateY(${-lift.toFixed(1)}px)` : '';
+  bowLockMark();
   if (placed || BS.camK <= 0) return false;
   const P = easeCamFollow(playerDraw, dt);
   placeChaseCamera(P, 4.5, dt);                               // the chase camera's spot and look …
   _bA.copy(camera.position); _bLA.set(P.x, P.y + 1.4, P.z);
-  bowCam(playerDraw, yaw, pitch, _bB); bowView(yaw, pitch, _bF);   // … and the aim camera's, from the un-eased position so screen centre = the sim's aim ray (bowAimCast uses player.pos)
+  bowCam(playerDraw, yaw, pitch, _bB); bowView(yaw, pitch + BOW.CAM_TILT, _bF);   // … and the boss camera's, from the un-eased position so the crosshair = the sim's aim ray (bowAimCast uses player.pos), looking CAM_TILT lower
   _bLB.copy(_bB).addScaledVector(_bF, 30);
   const k = dfSmooth(BS.camK);
   camera.position.lerpVectors(_bA, _bB, k);
@@ -13774,6 +14301,19 @@ function bowFrame(dt, placed) {
   }
   camera.lookAt(_bL);
   return true;
+}
+const LOCK_EL = document.getElementById('lock-mark'), _lmV = new THREE.Vector3();
+function bowLockMark() {                                      // the ring round a locked target
+  const on = BS.lock && BS.has && bowTargetPos(BS.lock, _lmV);
+  if (on) {
+    _lmV.project(camera);
+    if (_lmV.z < 1) {
+      LOCK_EL.style.display = 'block';
+      LOCK_EL.style.transform = `translate(${((_lmV.x * 0.5 + 0.5) * innerWidth).toFixed(1)}px, ${((-_lmV.y * 0.5 + 0.5) * innerHeight).toFixed(1)}px)`;
+      return;
+    }
+  }
+  LOCK_EL.style.display = 'none';
 }
 // cameraRig is installed by the Elytra section at load (a microtask queued after this one): chain onto it afterwards
 queueMicrotask(() => queueMicrotask(() => {
@@ -13826,6 +14366,168 @@ function bowTargets() {
   };
 }
 // ==== FINALE: bow (end) ====
+
+// ==== FINALE: hearts (begin) ====
+// Steve's health in the dragon fight (only there: the rest of the course has no damage). 10 hearts = HP.MAX.
+//   hurt    heroHurt(n, why): golden hearts (absorption, from an apple) soak it first; HP.IFRAME s of safety follow a
+//           hit. heroDot(n, why): damage over time (breath, fire) ignores the safety. heroBlast(p, [max, min], r, why):
+//           a blast, max at its centre … min at r.
+//   regen   1 HP every HP.REGEN s once HP.REGEN_AFTER s have passed without damage
+//   apples  golden apples sit on the roof (HP.APPLES spots, 2 at a time): walking into one while hurt heals
+//           HP.APPLE_HEAL over HP.APPLE_T s and gives HP.APPLE_ABS golden HP; a taken one grows back at the next spot
+//           after HP.APPLE_BACK s
+//   0 HP    Normal: knocked out — back on the roof with full hearts, and the dragon heals HP.KO_HEAL (+ HP.KO_SAFE s
+//           of safety). Hardcore: slain (the run ends).
+// All in the fixed step (the fight obstacle's update), so runs stay deterministic. DF.tame (tests) turns it off.
+const HP = { MAX: 20, IFRAME: 0.6, REGEN: 3, REGEN_AFTER: 6, KO_HEAL: 0.25, KO_SAFE: 2.5, FALL: 2,
+  APPLE_HEAL: 8, APPLE_T: 2.5, APPLE_ABS: 4, APPLE_BACK: [20, 35], APPLE_R: 1.1,
+  APPLES: [[5.2, 2.2], [-5.6, 1.2], [3.2, -3.6]] };              // [dx, dz] from the summit flag (clear of the beds)
+const HS = { hp: HP.MAX, abs: 0, iframe: 0, quiet: 0, regenT: 0, heal: 0, safe: 0, kos: 0, ko: '', flash: 0, apples: [], next: 2,
+             fullMsg: false, shown: '' };
+const heartImg = (() => {                                     // pixel hearts: full, half, empty, golden
+  const rows = ['.11.11.', '1221221', '1222221', '1222221', '.12221.', '..121..', '...1...'];
+  const mk = (fill, hi, half) => {
+    const c = document.createElement('canvas'); c.width = 7; c.height = 7;
+    const g = c.getContext('2d');
+    rows.forEach((r, y) => [...r].forEach((ch, x) => {
+      if (ch === '.') return;
+      const right = half && x > 3;
+      g.fillStyle = ch === '1' ? '#1a0505' : right ? '#3b3b3b' : (x === 1 && y === 1) || (x === 2 && y === 2) ? hi : fill;
+      g.fillRect(x, y, 1, 1);
+    }));
+    return c.toDataURL();
+  };
+  return { full: mk('#d81e1e', '#ff9b9b'), half: mk('#d81e1e', '#ff9b9b', true), empty: mk('#3b3b3b', '#555'), gold: mk('#f5c518', '#fff4a8') };
+})();
+const HEARTS_EL = document.getElementById('hearts'), TIRED_EL = document.getElementById('tired'), HURT_EL = document.getElementById('hurt');
+const appleGeo = (() => {
+  const rows = ['...B....', '...BL...', '.GGGGG..', 'GGYGGGG.', 'GYGGGGG.', 'GGGGGGG.', '.GGGGG..', '..GGG...'];
+  return pixelItemGeometry(rows, { G: 0xf5c518, Y: 0xfff59d, B: 0x6b4423, L: 0x4caf50 }, 0.07);
+})();
+const appleMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x6a4a00, emissiveIntensity: 0.6 });
+
+function heartsStart() {
+  Object.assign(HS, { hp: HP.MAX, abs: 0, iframe: 0, quiet: 0, regenT: 0, heal: 0, safe: 0, ko: '', flash: 0, next: 2, fullMsg: false, shown: '' });
+  for (const a of HS.apples) scene.remove(a.mesh);
+  HS.apples.length = 0;
+  if (DF.tame) return;
+  HP.APPLES.forEach((spot, i) => { if (i < 2) appleSpawn(i); });
+  HEARTS_EL.style.display = 'flex';
+}
+function heartsEnd() {
+  for (const a of HS.apples) scene.remove(a.mesh);
+  HS.apples.length = 0;
+  HEARTS_EL.style.display = TIRED_EL.style.display = 'none';
+  HURT_EL.style.opacity = 0;
+}
+function appleSpawn(i) {
+  const S = summitFlagPos, T = COURSE.summitTop, [dx, dz] = HP.APPLES[i];
+  const mesh = new THREE.Mesh(appleGeo, appleMat);
+  mesh.position.set(S.x + dx, T + 0.6, S.z + dz); mesh.castShadow = true;
+  scene.add(mesh);
+  HS.apples.push({ i, mesh, x: S.x + dx, z: S.z + dz, back: 0, taken: false });
+}
+// → true if this knocked Steve out (Normal) or killed him (Hardcore)
+function heroHurt(n, why, ignoreSafe = false) {
+  if (DF.tame || !DF.active || dying || DF.phase === 'dying' || HS.safe > 0 || HS.ko) return false;
+  if (!ignoreSafe && HS.iframe > 0) return false;
+  if (!ignoreSafe) HS.iframe = HP.IFRAME;
+  return heroLose(n, why, true);
+}
+function heroDot(n, why) {
+  if (DF.tame || !DF.active || dying || DF.phase === 'dying' || HS.safe > 0 || HS.ko) return false;
+  return heroLose(n, why, false);
+}
+function heroBlast(p, [max, min], r, why) {
+  const d = player.pos.distanceTo(p);
+  return d < r ? heroHurt(THREE.MathUtils.lerp(max, min, d / r), why) : false;
+}
+function heroLose(n, why, big) {
+  const soak = Math.min(HS.abs, n);
+  HS.abs -= soak; HS.hp -= n - soak;
+  HS.quiet = 0; HS.regenT = 0;
+  if (big) { HS.flash = 1; sfx(140, 0.18, 'square', 0.08, 70); }
+  if (HS.hp > 0.001) return false;
+  HS.hp = 0;
+  if (HARDCORE) {                                             // one life: the run ends
+    if (!dying) { dying = true; deathTimer = 1.4; deathInfo = `${why} — slain by the Ender Dragon`; player.vel.set(0, 2, 0); sfx(200, 1, 'sawtooth', 0.15, 50); }
+    return true;
+  }
+  HS.ko = why;                                                // Normal: knocked out — handled at the end of this step (heartsStep)
+  return true;
+}
+function heroKO() {                                           // back on the roof with full hearts; the dragon gets its breath back
+  const why = HS.ko;
+  HS.ko = ''; HS.kos++;
+  DF.hp = Math.min(1, DF.hp + HP.KO_HEAL); dfBar();
+  toCheckpoint(`💫 Knocked out (${why})! The dragon recovers… back on the roof`);
+  HS.hp = HP.MAX; HS.abs = 0; HS.heal = 0; HS.safe = HP.KO_SAFE; HS.iframe = 0;
+}
+function heartsStep(h) {
+  if (DF.tame) return;
+  if (HS.ko) { heroKO(); return; }
+  if (HS.iframe > 0) HS.iframe -= h;
+  if (HS.safe > 0) HS.safe -= h;
+  HS.quiet += h;
+  if (HS.heal > 0) {                                          // an apple's healing, spread over APPLE_T s
+    const d = Math.min(HS.heal, HP.APPLE_HEAL / HP.APPLE_T * h);
+    HS.heal -= d; HS.hp = Math.min(HP.MAX, HS.hp + d);
+  }
+  if (HS.quiet >= HP.REGEN_AFTER && HS.hp < HP.MAX && (HS.regenT += h) >= HP.REGEN) { HS.regenT = 0; HS.hp = Math.min(HP.MAX, HS.hp + 1); }
+  const P = player.pos;
+  for (let k = HS.apples.length - 1; k >= 0; k--) {
+    const a = HS.apples[k];
+    if (a.taken) {
+      if ((a.back -= h) <= 0) {                               // grows back at the next free spot in turn
+        scene.remove(a.mesh); HS.apples.splice(k, 1);
+        let j = HS.next;
+        for (let n = 0; n < HP.APPLES.length && HS.apples.some(b => b.i === j); n++) j = (j + 1) % HP.APPLES.length;
+        HS.next = (j + 1) % HP.APPLES.length;
+        appleSpawn(j);
+      }
+      continue;
+    }
+    if (Math.hypot(P.x - a.x, P.z - a.z) < HP.APPLE_R && Math.abs(P.y + 0.6 - a.mesh.position.y) < 1.6) {
+      if (HS.hp >= HP.MAX - 0.01 && HS.abs >= HP.APPLE_ABS) {
+        if (!HS.fullMsg) { HS.fullMsg = true; flashMessage('🍎 Full health — save the golden apple for later'); }
+        continue;
+      }
+      a.taken = true; a.mesh.visible = false; a.back = HP.APPLE_BACK[HARDCORE ? 1 : 0];
+      HS.heal += HP.APPLE_HEAL; HS.abs = Math.max(HS.abs, HP.APPLE_ABS);
+      flashMessage('🍎 Golden apple! +4 ♥ and 2 golden hearts');
+      sfx(523, 0.12, 'triangle', 0.08); setTimeout(() => sfx(784, 0.2, 'triangle', 0.08), 90);
+      fx.burst(a.mesh.position, 24, 3, 0.7, 1, [0xfff59d, 0xf5c518]);
+    }
+  }
+}
+function heartsFrame(dt) {                                    // per frame: the hearts row, the hurt flash, apples, tired badge
+  if (!DF.active || DF.tame) return;
+  const half = Math.ceil(HS.hp - 1e-6), gold = Math.ceil(HS.abs / 2 - 1e-6);
+  const key = half + '|' + gold;
+  if (key !== HS.shown) {
+    const prev = HS.shown, grew = prev && +prev.split('|')[0] < half;
+    HS.shown = key;
+    let html = '';
+    for (let i = 0; i < HP.MAX / 2; i++) {
+      const v = half - i * 2;
+      html += `<img src="${v >= 2 ? heartImg.full : v === 1 ? heartImg.half : heartImg.empty}">`;
+    }
+    for (let i = 0; i < gold; i++) html += `<img src="${heartImg.gold}">`;
+    HEARTS_EL.innerHTML = html;
+    if (prev && !grew) { HEARTS_EL.classList.remove('shake'); void HEARTS_EL.offsetWidth; HEARTS_EL.classList.add('shake'); }
+  }
+  HS.flash = Math.max(0, HS.flash - dt * 2.5);
+  HURT_EL.style.opacity = Math.max(HS.flash, HS.hp <= 6 ? 0.25 + 0.15 * Math.sin(performance.now() / 180) : 0).toFixed(3);
+  TIRED_EL.style.display = BS.tiredT > 0 ? 'block' : 'none';
+  if (BS.tiredT > 0) TIRED_EL.textContent = `😮‍💨 Tired arms ${Math.ceil(BS.tiredT)} s`;
+  const t = performance.now() / 1000;
+  for (const a of HS.apples) {
+    if (a.taken) continue;
+    a.mesh.rotation.y = t * 1.8; a.mesh.position.y = COURSE.summitTop + 0.6 + Math.sin(t * 2.4 + a.i) * 0.12;
+    if (Math.random() < dt * 6) fx.emit(a.x + (Math.random() - 0.5) * 0.7, a.mesh.position.y + (Math.random() - 0.5) * 0.6, a.z + (Math.random() - 0.5) * 0.7, 0, 0.6, 0, 0.6, 0.7, 0xfff59d);
+  }
+}
+// ==== FINALE: hearts (end) ====
 
 // ============ Game loop ============
 let elapsed = 0, lastT = performance.now(), gameOver = false;
