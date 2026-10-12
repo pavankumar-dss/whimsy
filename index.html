@@ -146,9 +146,6 @@
     font-family: 'Press Start 2P', monospace; font-size: .8rem; line-height: 1.8; }
   #rotate b { font-size: 3rem; }
   @media (orientation: portrait) { body.touch #rotate { display: flex; } }
-  #pause-sens { display: flex; align-items: center; gap: 12px; margin-top: 14px; color: #e0e0e0;
-    font-family: 'Press Start 2P', monospace; font-size: .6rem; }
-  #pause-sens input { width: 160px; }
   body.touch #settings { right: calc(10px + env(safe-area-inset-right)); top: 8px; }
   body.touch .set-btn { padding: 8px 11px; }
   /* short landscape screens (phones): smaller HUD, menus that fit or scroll */
@@ -173,6 +170,28 @@
     #pause-screen h1 { font-size: 1.4rem !important; }
   }
   @media (max-width: 760px) { body.touch #hud .hud-box:last-child { display: none; } }
+  /* ⚙ settings panel (over the menus and the pause screen) */
+  #set-panel { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.55); pointer-events: all; padding: 10px; }
+  #set-panel.open { display: flex; }
+  .sp-box { background: #26262b; border: 2px solid #000; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12);
+    color: #e5e5e5; padding: 16px 20px; width: min(620px, 100%); max-height: 100%; overflow-y: auto; }
+  .sp-box h2 { font-family: 'Press Start 2P', monospace; font-size: .9rem; color: #ffff54; text-shadow: 2px 2px #3f3f3f;
+    margin-bottom: 12px; text-align: center; }
+  .sp-row { display: flex; align-items: center; gap: 12px; margin: 9px 0; flex-wrap: wrap; }
+  .sp-row > span { width: 150px; font-family: 'Press Start 2P', monospace; font-size: .55rem; color: #cbd5e1; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+  .seg button { background: #3a3a3a; color: #fff; border: 2px solid #000; padding: 7px 10px; cursor: pointer;
+    font-family: 'Press Start 2P', monospace; font-size: .5rem; box-shadow: inset 0 -3px rgba(0,0,0,.3); }
+  .seg button.on { background: linear-gradient(#8fd48f, #5da35d); }
+  .seg button.auto { outline: 2px dashed #8fd48f; outline-offset: -4px; }
+  .seg button:disabled { cursor: default; opacity: .55; }
+  .seg button:disabled.auto { opacity: .9; }
+  .sp-note { font-size: .72rem; color: #a3a3a3; margin: 2px 0 8px 162px; line-height: 1.5; }
+  .sp-note.warn { color: #fbbf24; }
+  #sp-done { display: block; margin: 14px auto 0; }
+  @media (max-width: 560px) { .sp-row > span { width: 100%; } .sp-note { margin-left: 0; } }
+  @media (max-height: 520px) { .sp-box { padding: 10px 14px; } .sp-row { margin: 6px 0; } .sp-box h2 { margin-bottom: 6px; } }
 </style>
 </head>
 <body>
@@ -210,7 +229,7 @@
   <div id="boss"><span id="boss-name">🐉 Ender Dragon</span><div id="boss-track"><div id="boss-fill"></div></div></div>
   <div id="settings">
     <button class="set-btn" id="btn-mute" title="Mute (M)">🔊</button>
-    <button class="set-btn" id="btn-quality" title="Toggle quality">✨</button>
+    <button class="set-btn" id="btn-settings" title="Settings">⚙</button>
     <button class="set-btn" id="btn-tips" title="Tips: first time only">💡</button>
     <button class="set-btn touch-only" id="btn-cp" title="Back to the last checkpoint">↩</button>
     <button class="set-btn touch-only" id="btn-pause" title="Pause">⏸</button>
@@ -251,6 +270,7 @@
     </div>
     <button class="btn" id="start-normal">NORMAL</button>
     <button class="btn hard" id="start-hard">💀 HARDCORE</button>
+    <button class="btn" id="btn-settings-menu" style="padding:10px 16px;font-size:.65rem;">⚙ SETTINGS</button>
     <div id="mode-note"></div>
   </div>
 
@@ -280,9 +300,30 @@
   <p class="tag" id="pause-stats" style="margin-bottom:24px;"></p>
   <button class="btn" id="btn-resume">▶ RESUME</button>
   <button class="btn" id="btn-restart">↺ RESTART RUN</button>
+  <button class="btn" id="btn-settings-pause">⚙ SETTINGS</button>
   <button class="btn hard" id="btn-quit">🚪 QUIT TO MENU</button>
   <div class="desktop-only" style="font-size:.7rem;color:#fbbf24;margin-top:16px;font-family:'Press Start 2P',monospace;">Esc / P to resume · R quick restart</div>
-  <label class="touch-only" id="pause-sens">👆 Look speed <input type="range" id="sens" min="0.4" max="2.5" step="0.1" value="1"></label>
+</div>
+
+<div id="set-panel">
+  <div class="sp-box">
+    <h2>⚙ SETTINGS</h2>
+    <div class="sp-row"><span>Graphics</span><div class="seg" id="sp-mode">
+      <button data-v="quality">Fixed quality</button><button data-v="framerate">Fixed frame rate</button><button data-v="custom">Custom</button>
+    </div></div>
+    <p class="sp-note" id="sp-mode-note"></p>
+    <div class="sp-row"><span>Quality</span><div class="seg" id="sp-tier">
+      <button data-v="3">✨ High</button><button data-v="2">🌤 Medium</button><button data-v="1">💤 Low</button><button data-v="0">🥔 Potato</button>
+    </div></div>
+    <div class="sp-row"><span id="sp-fps-label">Frame rate</span><div class="seg" id="sp-fps">
+      <button data-v="0" id="sp-fps-display">Display</button><button data-v="60">60</button><button data-v="30">30</button>
+    </div></div>
+    <p class="sp-note" id="sp-fps-note"></p>
+    <div class="sp-row touch-only"><span>Look speed</span><input type="range" id="sens" min="0.4" max="2.5" step="0.1" value="1"></div>
+    <div class="sp-row"><span>FPS counter</span><div class="seg" id="sp-showfps"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+    <div class="sp-row"><span>Sound</span><div class="seg" id="sp-sound"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+    <button class="btn" id="sp-done">✔ DONE</button>
+  </div>
 </div>
 
 <script type="importmap">
@@ -5871,10 +5912,8 @@ function toggleMute() {
   muted = !muted;
   document.getElementById('btn-mute').textContent = muted ? '🔇' : '🔊';
 }
-// Quality tiers — the ✨ button cycles high → medium → low → potato. pr: max pixel ratio; shadow: sun shadow map
-// size (0 = off); far: × every biome's fog distances (and so the far plane); cull: meshes smaller than this many CSS
-// px on screen aren't drawn (detailCull). Desktops start on high, touch devices on medium. Until the player picks
-// one, a run that averages under QUALITY_FPS fps steps down a tier (autoQuality).
+// Quality tiers (⚙ settings). pr: max pixel ratio; shadow: sun shadow map size (0 = off); far: × every biome's fog
+// distances (and so the far plane); cull: meshes smaller than this many CSS px on screen aren't drawn (detailCull).
 const QUALITY = [
   { icon: '🥔', name: 'potato', pr: 0.75, bloom: false, shadow: 0,    far: 0.6, cull: 6 },
   { icon: '💤', name: 'low',    pr: 1,    bloom: false, shadow: 0,    far: 0.8, cull: 4 },
@@ -5905,65 +5944,225 @@ function detailCull(dt) {
     o.layers.mask = tiny ? 2 : 1;
   }
 }
-const QUALITY_FPS = 40;
-let qualityPicked = tipStoreGet('whimsy-quality', null);
-let qTier = qualityPicked !== null && QUALITY[+qualityPicked] ? +qualityPicked : (COARSE ? 2 : 3);
-let QUAL = QUALITY[qTier];
+// ---- ⚙ settings. SET.mode:
+//   'quality'    fixed quality: SET.tier stays put and frames are capped at SET.fps (0 = the display's rate); the frame
+//                rate may dip in busy places
+//   'framerate'  fixed frame rate: holds SET.fps by scaling the render resolution (DRS) and, when that isn't enough,
+//                stepping the quality tier down (and back up after a long steady spell)
+//   'custom'     SET.tier as chosen plus SET.fps as a target: only the render resolution adjusts
+// Kept in localStorage ('whimsy-settings'). Under test automation (navigator.webdriver) nothing adapts.
 function tipStoreGet(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
-function applyQuality(tier) {
-  qTier = tier; QUAL = QUALITY[tier];
-  bloom.enabled = QUAL.bloom;
-  const pr = Math.min(devicePixelRatio, QUAL.pr);
+const SET = (() => {
+  const d = { mode: 'framerate', tier: COARSE ? 2 : 3, fps: COARSE ? 60 : 0, showFps: false, sens: +tipStoreGet('whimsy-sens', 1) || 1 };
+  const saved = tipStoreGet('whimsy-settings', null), old = tipStoreGet('whimsy-quality', null);
+  if (saved) { try { Object.assign(d, JSON.parse(saved)); } catch { /* defaults */ } }
+  else if (old !== null && QUALITY[+old]) Object.assign(d, { mode: 'quality', tier: +old });   // picked with the old ✨ button
+  if (!QUALITY[d.tier]) d.tier = 2;
+  if (!['quality', 'framerate', 'custom'].includes(d.mode)) d.mode = 'framerate';
+  return d;
+})();
+if (/[?&]fps=1\b/.test(location.search)) SET.showFps = true;
+function saveSettings() { try { localStorage.setItem('whimsy-settings', JSON.stringify(SET)); } catch { /* not remembered */ } }
+let qTier = SET.tier, QUAL = QUALITY[qTier];
+const DRS = { scale: 1, MIN: 0.5 };                     // render-resolution scale, × the tier's pixel ratio
+function applyPixelRatio() {
+  const pr = Math.max(0.5, Math.min(devicePixelRatio, QUAL.pr) * DRS.scale);
+  if (Math.abs(renderer.getPixelRatio() - pr) < 1e-3) return;
   renderer.setPixelRatio(pr);
   composer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
+}
+function setScale(x) { DRS.scale = Math.min(1, Math.max(DRS.MIN, Math.round(x * 20) / 20)); applyPixelRatio(); }
+function applyQuality(tier) {
+  qTier = tier; QUAL = QUALITY[tier];
+  bloom.enabled = QUAL.bloom;
+  applyPixelRatio();
   sun.castShadow = QUAL.shadow > 0;                   // (three recompiles the lit materials on its own)
   if (QUAL.shadow && sun.shadow.mapSize.x !== QUAL.shadow) {
     sun.shadow.mapSize.set(QUAL.shadow, QUAL.shadow);
     if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   }
-  const b = document.getElementById('btn-quality');
-  b.textContent = QUAL.icon;
-  b.title = `Graphics: ${QUAL.name} (click to change)`;
-  fpsMon.reset();
+  frameCtl.reset();
 }
-function toggleQuality() {
-  qualityPicked = (qTier + QUALITY.length - 1) % QUALITY.length;
-  try { localStorage.setItem('whimsy-quality', qualityPicked); } catch { /* not remembered */ }
-  applyQuality(qualityPicked);
-  flashMessage(`${QUAL.icon} Graphics: ${QUAL.name}`);
+
+// ---- frame pacing. requestAnimationFrame ticks once per display refresh (browsers can't go past it); FRAME.hz is
+// estimated from the tick spacing (a low percentile, so slow frames don't drag it down). animate() skips ticks to
+// keep to the cap (SET.fps below the display's rate: a frame is due every 1000 / fps ms, ± half a refresh) and to
+// rest behind menus: 4 frames a second behind the opaque start / win / death screens, 10 behind the see-through
+// pause screen and the settings panel.
+const FRAME = { hz: 60, deltas: [], ticks: 0, last: 0, due: 0, rest: 0, OPAQUE: 250, DIM: 100,
+  RATES: [30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 170, 180, 200, 240, 280, 360] };
+const endScreens = ['win-screen', 'death-screen'].map(id => document.getElementById(id));
+function frameGate(now) {                               // → true when this tick runs a frame
+  const d = now - FRAME.last;
+  FRAME.last = now;
+  if (d > 2 && d < 100) { FRAME.deltas.push(d); if (FRAME.deltas.length > 120) FRAME.deltas.shift(); }
+  if (++FRAME.ticks % 30 === 0 && FRAME.deltas.length >= 20) {
+    const sorted = [...FRAME.deltas].sort((a, b) => a - b);
+    const raw = 1000 / sorted[Math.floor(sorted.length * 0.2)];
+    const std = FRAME.RATES.reduce((b, r) => Math.abs(r - raw) < Math.abs(b - raw) ? r : b);
+    FRAME.hz = Math.abs(std - raw) / std < 0.07 ? std : Math.round(raw);   // tick jitter: snap to a standard rate
+  }
+  const opaque = !started || endScreens.some(e => e.style.display === 'flex');
+  const rest = opaque ? FRAME.OPAQUE : paused || setPanel.isOpen ? FRAME.DIM : 0;
+  if (rest) {
+    if (now - FRAME.rest < rest) return false;
+    FRAME.rest = FRAME.due = now;
+    return true;
+  }
+  const fps = SET.fps;
+  if (fps && fps < FRAME.hz - 1) {
+    const iv = 1000 / fps;
+    if (now < FRAME.due - 500 / FRAME.hz) return false;
+    FRAME.due = Math.max(FRAME.due + iv, now - iv);     // keep the cadence; resync after a stall
+  }
+  return true;
 }
-// autoQuality: frame times are averaged over 3 s windows of play (the first window after a start, resume or tier
-// change is skipped: shader compiles and course building stutter); a slow window drops one tier
-const fpsMon = {
-  t: 0, n: 0, skip: true,
-  reset() { this.t = 0; this.n = 0; this.skip = true; },
+const goalFps = () => Math.min(SET.fps || FRAME.hz, FRAME.hz);
+
+// ---- the frame-rate controller ('framerate' and 'custom'). Each second of play is one sample (the first after a
+// start, resume or change is skipped: shaders compile and resizes stutter).
+//   slow (< 90 % of the goal): the resolution drops (by about the frame-time ratio, 8–25 %) — unless the last drop
+//     didn't help (the CPU is the limit, not the pixels): then it's undone, and 'framerate' drops a tier instead
+//   steady (≥ 96 %) for `back` s: one step back up (resolution, or in 'framerate' a tier once at full resolution),
+//     kept if the next second holds, else undone with the wait doubled. Changes are at most once a second, so the
+//     resizes don't hitch the game often, and they never touch input timing.
+const frameCtl = {
+  t: 0, n: 0, skip: true, steady: 0, probe: null, down: null, back: 3, tierBack: 20, cpuHold: 0,
+  reset() { this.t = this.n = 0; this.skip = true; this.steady = 0; this.probe = null; this.down = null; },
   frame(dt) {
-    if (qualityPicked !== null || navigator.webdriver || qTier === 0) return;
-    if (!started || paused || gameOver || document.hidden) { this.reset(); return; }
+    if (SET.mode === 'quality' || (navigator.webdriver && !this.test)) return;   // test: suites drive it on purpose
+    if (!started || paused || gameOver || dying || document.hidden || setPanel.isOpen) { this.reset(); return; }
     this.t += dt; this.n++;
-    if (this.t < 3) return;
-    const fps = this.n / this.t, skip = this.skip;
-    this.reset(); this.skip = false;
-    if (skip || fps >= QUALITY_FPS) return;
-    applyQuality(qTier - 1);
-    flashMessage(`${QUAL.icon} Graphics lowered to ${QUAL.name} for a smoother game — tap ${QUAL.icon} to change`);
+    if (this.t < 1) return;
+    const fps = this.n / this.t, goal = goalFps(), skip = this.skip;
+    this.t = this.n = 0; this.skip = false;
+    if (this.cpuHold > 0) this.cpuHold--;
+    if (skip) return;
+    if (this.probe) {                                   // the last step up: kept if it holds, else undone
+      const p = this.probe;
+      this.probe = null;
+      if (fps < goal * 0.9) { p.undo(); this[p.wait] = Math.min(p.max, this[p.wait] * 2); this.skip = true; return; }
+      this[p.wait] = p.base;
+    }
+    if (fps < goal * 0.9) {
+      this.steady = 0;
+      const d = this.down;
+      this.down = null;
+      if (d && fps < d.fps * 1.03) {                    // the last resolution drop didn't help: the CPU is the limit
+        setScale(d.scale);
+        this.cpuHold = 20;
+        if (SET.mode === 'framerate' && qTier > 0) this.tier(-1);
+      } else if (DRS.scale > DRS.MIN + 1e-6 && !this.cpuHold) {
+        this.down = { fps, scale: DRS.scale };
+        setScale(DRS.scale * Math.min(0.92, Math.max(0.75, Math.sqrt(fps / goal))));
+      } else if (SET.mode === 'framerate' && qTier > 0) this.tier(-1);
+      this.skip = true;
+      return;
+    }
+    this.down = null;
+    if (fps < goal * 0.96) { this.steady = 0; return; }
+    this.steady++;
+    if (DRS.scale < 1 && this.steady >= this.back) {
+      const was = DRS.scale;
+      setScale(was + 0.1);
+      this.probe = { undo: () => setScale(was), wait: 'back', base: 3, max: 48 };
+      this.steady = 0; this.skip = true;
+    } else if (SET.mode === 'framerate' && DRS.scale >= 1 && qTier < QUALITY.length - 1 && this.steady >= this.tierBack) {
+      const was = qTier;
+      this.tier(+1);
+      this.probe = { undo: () => this.tier(was - qTier), wait: 'tierBack', base: 20, max: 320 };
+      this.steady = 0; this.skip = true;
+    }
+  },
+  tier(step) {                                          // 'framerate': the tier it settles on is where it starts next time
+    applyQuality(qTier + step);
+    if (step < 0) setScale(Math.max(DRS.scale, 0.8));
+    SET.tier = qTier; saveSettings();
+    if (step < 0) flashMessage(`${QUAL.icon} Graphics: ${QUAL.name}, to hold ${goalFps()} fps`);
+    setPanel.sync();
   },
 };
-// ?fps=1: a frame-rate readout (bottom left) with the tier and the draw calls, for tuning on a real device
-const fpsEl = /[?&]fps=1\b/.test(location.search) ? document.getElementById('fps') : null;
-const fpsShow = { t: 0, n: 0 };
-function fpsReadout(dt) {
-  if (!fpsEl) return;
+
+// ---- FPS counter (⚙ or ?fps=1): fps · display rate · tier and resolution · CPU time of a frame · draw calls.
+// The CPU time is the script's share of a frame (game + scene submission): 1000 / it is roughly the frame rate the
+// game could reach if the display allowed it (GPU time isn't measurable here).
+const fpsEl = document.getElementById('fps');
+const fpsShow = { t: 0, n: 0, cpu: 0 };
+function fpsReadout(dt, cpu) {
+  fpsShow.cpu += cpu;
+  if (!SET.showFps) { fpsEl.style.display = 'none'; fpsShow.t = fpsShow.n = fpsShow.cpu = 0; return; }
   fpsShow.t += dt; fpsShow.n++;
   if (fpsShow.t < 0.5) return;
   fpsEl.style.display = 'block';
-  fpsEl.textContent = `${Math.round(fpsShow.n / fpsShow.t)} fps · ${QUAL.name} · ${renderer.info.render.calls} calls`;
-  fpsShow.t = fpsShow.n = 0;
+  fpsEl.textContent = `${Math.round(fpsShow.n / fpsShow.t)} fps · ${FRAME.hz} Hz · ${QUAL.name} ${Math.round(DRS.scale * 100)}%` +
+    ` · ${(fpsShow.cpu / fpsShow.n).toFixed(1)} ms cpu · ${renderer.info.render.calls} calls`;
+  fpsShow.t = fpsShow.n = fpsShow.cpu = 0;
 }
-document.getElementById('btn-mute').onclick = toggleMute;
-document.getElementById('btn-quality').onclick = toggleQuality;
+
+// ---- ⚙ panel
+const setPanel = {
+  el: document.getElementById('set-panel'), isOpen: false, resumeTo: null,
+  open() {
+    if (started && !paused && !gameOver) {              // opening it mid-run pauses (desktop: the mouse is let go)
+      if (document.pointerLockElement) document.exitPointerLock();
+      pauseGame();
+    }
+    this.isOpen = true;
+    this.el.classList.add('open');
+    this.sync();
+  },
+  close() { this.isOpen = false; this.el.classList.remove('open'); },
+  sync() {
+    const seg = (id, v, dis, auto) => {
+      for (const b of document.querySelectorAll(`#${id} button`)) {
+        b.classList.toggle('on', b.dataset.v === String(v) && !auto);
+        b.classList.toggle('auto', !!auto && b.dataset.v === String(v));
+        b.disabled = !!dis;
+      }
+    };
+    const fr = SET.mode === 'framerate';
+    seg('sp-mode', SET.mode);
+    seg('sp-tier', fr ? qTier : SET.tier, fr, fr);
+    seg('sp-fps', SET.fps);
+    seg('sp-showfps', SET.showFps ? 1 : 0);
+    seg('sp-sound', muted ? 0 : 1);
+    document.getElementById('sp-fps-display').textContent = `Display (${FRAME.hz})`;
+    document.getElementById('sp-fps-label').textContent = SET.mode === 'quality' ? 'Frame rate cap' : 'Target frame rate';
+    const pct = DRS.scale < 1 ? ` at ${Math.round(DRS.scale * 100)}% resolution` : '';
+    document.getElementById('sp-mode-note').textContent = {
+      quality: 'Your quality stays put; the frame rate is capped and may dip in busy places.',
+      framerate: `Holds the frame rate: the resolution, then the quality, adjust to keep it. Now: ${QUAL.name}${pct}.`,
+      custom: `Your quality, plus a frame-rate target: only the resolution adjusts to hold it.${pct ? ' Now' + pct + '.' : ''}`,
+    }[SET.mode];
+    const note = document.getElementById('sp-fps-note'), f = SET.fps, ratio = FRAME.hz / f;
+    const uneven = f && f < FRAME.hz - 1 && Math.abs(ratio - Math.round(ratio)) > 0.08;
+    note.className = 'sp-note' + (uneven ? ' warn' : '');
+    note.textContent = !f ? `Your display refreshes ${FRAME.hz} times a second — browsers can't draw faster than that.`
+      : f >= FRAME.hz - 1 ? `Your display runs at ${FRAME.hz} Hz, so this is the same as Display.`
+      : uneven ? `${f} doesn't divide your ${FRAME.hz} Hz display evenly — motion may look slightly uneven.`
+      : `Every ${Math.round(ratio)}${['', '', 'nd', 'rd'][Math.round(ratio)] || 'th'} refresh of your ${FRAME.hz} Hz display.`;
+  },
+  set(key, v) {
+    if (key === 'mode') { SET.mode = v; DRS.scale = 1; applyQuality(SET.tier); }
+    if (key === 'tier') { SET.tier = +v; applyQuality(SET.tier); }
+    if (key === 'fps') { SET.fps = +v; FRAME.due = 0; frameCtl.reset(); }
+    if (key === 'showfps') SET.showFps = v === '1';
+    if (key === 'sound' && (v === '1') === muted) toggleMute();
+    saveSettings();
+    this.sync();
+  },
+};
+for (const [id, key] of [['sp-mode', 'mode'], ['sp-tier', 'tier'], ['sp-fps', 'fps'], ['sp-showfps', 'showfps'], ['sp-sound', 'sound']])
+  for (const b of document.querySelectorAll(`#${id} button`)) b.onclick = () => setPanel.set(key, b.dataset.v);
+document.getElementById('sp-done').onclick = () => setPanel.close();
+for (const id of ['btn-settings', 'btn-settings-menu', 'btn-settings-pause'])
+  document.getElementById(id).onclick = () => setPanel.open();
+addEventListener('keydown', e => {                      // Esc / P close the panel (and don't resume the game too)
+  if (setPanel.isOpen && (e.code === 'Escape' || e.code === 'KeyP')) { e.preventDefault(); e.stopImmediatePropagation(); setPanel.close(); }
+}, true);
+document.getElementById('btn-mute').onclick = () => { toggleMute(); setPanel.sync(); };
 applyQuality(qTier);
 
 // ============ Settings: checkpoint tips ============
@@ -6131,7 +6330,7 @@ const STICK = { R: 56, DEAD: 0.18, SPRINT: 0.86, KEY: 0.38, ZONE: 0.42, FLY_YAW:
 const stick = { on: false, id: -1, cx: 0, cy: 0, x: 0, y: 0, mag: 0 };
 const look = { id: -1, x: 0, y: 0 };
 const tbtn = {};                                        // pointerId → button key ('Space', 'KeyF', 'KeyE')
-let lookSens = +tipStoreGet('whimsy-sens', 1) || 1;
+let lookSens = SET.sens;
 const TEL = Object.fromEntries(['touch', 't-stick', 't-knob', 't-jump', 't-bow', 't-use'].map(k => [k, document.getElementById(k)]));
 function goFullscreen() {                               // Android: fullscreen + landscape lock (iOS has neither)
   const el = document.documentElement;
@@ -6228,7 +6427,7 @@ for (const b of document.querySelectorAll('[data-relaunch]')) b.onclick = () => 
 {
   const s = document.getElementById('sens');
   s.value = lookSens;
-  s.oninput = () => { lookSens = +s.value; try { localStorage.setItem('whimsy-sens', s.value); } catch { /* not remembered */ } };
+  s.oninput = () => { lookSens = SET.sens = +s.value; saveSettings(); };
 }
 
 // ============ Obstacle hooks ============
@@ -13922,10 +14121,11 @@ function easeCamFollow(P, dt) {
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
-  fpsMon.frame(Math.min((now - lastT) / 1000, 0.5));
-  fpsReadout((now - lastT) / 1000);
-  if (fpsEl) { renderer.info.autoReset = false; renderer.info.reset(); }   // count every pass of the frame (bloom too)
-  const dt = Math.min((now - lastT) / 1000, 0.05);
+  if (!frameGate(now)) return;                          // frame cap / resting behind a menu
+  frameCtl.frame(Math.min((now - lastT) / 1000, 0.5));
+  renderer.info.autoReset = !SET.showFps;
+  if (SET.showFps) renderer.info.reset();               // count every pass of the frame (bloom too)
+  const dt = Math.min((now - lastT) / 1000, 0.05), frameDt = (now - lastT) / 1000;
   lastT = now;
   touchFrame(dt);
 
@@ -13986,6 +14186,7 @@ function animate() {
   hud.height.textContent = Math.max(0, Math.round(player.pos.y)) + 'm';
 
   composer.render();
+  fpsReadout(frameDt, performance.now() - now);
 }
 
 // ↺ quick restart (R): rebuild the same course behind the menu, then start on the first key press or click (a user
